@@ -193,6 +193,10 @@ window.__ModuleLoader__.load({
           setMsg('先选一个分类')
           return
         }
+        if (needsLogin && !loggedIn && !(market === 'xhs' && mode === 'redmoji')) {
+          setMsg(`先点右边「扫码登录」，${currentMarket ? currentMarket.name : ''}登录成功后再抓`)
+          return
+        }
         setBusy(true)
         setMsg('已提交抓取，稍等…')
         const before = (counts && counts.total) || 0
