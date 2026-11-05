@@ -9,9 +9,94 @@ import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { defineTool } from '@deepseek-ai/dsh-tools'
 
 export const inject = ['tools']
+
+/**
+ * `@deepseek-ai/dsh-tools` ships inside the Harness runtime, so a bundle that is
+ * installed as a link (or copied outside the profile's `node_modules`) cannot
+ * resolve it by bare specifier — Node looks up from the bundle's real path and
+ * finds nothing. Import it lazily and fall back to a minimal normaliser, so the
+ * bundle loads from any folder.
+ */
+let defineToolRef = null
+
+async function resolveDefineTool() {
+  if (defineToolRef) return defineToolRef
+  try {
+    const mod = await import('@deepseek-ai/dsh-tools')
+    defineToolRef = typeof mod.defineTool === 'function' ? mod.defineTool : plainTool
+  } catch {
+    defineToolRef = plainTool
+  }
+  return defineToolRef
+}
+
+/** Human-readable projection of a tool result (the runtime requires `output.render`). */
+function renderValue(value) {
+  if (value && typeof value === 'object') {
+    const lines = Object.entries(value).map(([key, item]) => {
+      const text = item && typeof item === 'object' ? JSON.stringify(item) : String(item)
+      return `${key}: ${text.length > 240 ? `${text.slice(0, 240)}…` : text}`
+    })
+    return lines.join('\n')
+  }
+  return String(value ?? '')
+}
+
+/** Fill in the `output.render` contract that `register()` insists on. */
+function withDefaultRender(options) {
+  const output = options.output || {}
+  if (typeof output.render === 'function') return options
+  return {
+    ...options,
+    output: {
+      ...output,
+      render: (_args, value) => [{ type: 'text', text: renderValue(value) }],
+    },
+  }
+}
+
+/** Shorthand `{key: {type, required, description}}` → object JSON Schema. */
+function plainTool(options) {
+  return {
+    ...options,
+    parameters: normalizeSchema({ type: 'object', properties: options.parameters || {} }),
+    output: {
+      ...(options.output || {}),
+      schema: normalizeSchema(options.output?.schema || { type: 'object' }),
+    },
+  }
+}
+
+/**
+ * `defineTool` accepts a shorthand where a property carries `required: true`;
+ * the runtime validates against strict JSON Schema, so lift those flags into the
+ * parent's `required` array (recursively).
+ */
+function normalizeSchema(spec) {
+  if (!spec || typeof spec !== 'object') return spec
+  const out = { ...spec }
+  if (out.type === 'array' && out.items) out.items = normalizeSchema(out.items)
+  if (out.properties && typeof out.properties === 'object') {
+    const properties = {}
+    const required = []
+    for (const [key, child] of Object.entries(out.properties)) {
+      const normalized = normalizeSchema(child)
+      if (normalized && normalized.required === true) {
+        required.push(key)
+        delete normalized.required
+      }
+      properties[key] = normalized
+    }
+    out.properties = properties
+    const declared = Array.isArray(out.required) ? out.required : []
+    const merged = [...new Set([...declared, ...required])]
+    if (merged.length) out.required = merged
+    else delete out.required
+  }
+  return out
+}
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
@@ -56,7 +141,9 @@ function brief(item) {
   }
 }
 
-export function apply(ctx, config = {}) {
+export async function apply(ctx, config = {}) {
+  const baseDefineTool = await resolveDefineTool()
+  const defineTool = (options) => baseDefineTool(withDefaultRender(options))
   const projectDir = resolveProject(config.projectDir)
   const port = Number(config.port || 8799)
   const autoStart = config.autoStart !== false
