@@ -40,4 +40,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: dsh-stickers/dist/dsh-stickers-portable.zip
+          overwrite: true
           generate_release_notes: true
