@@ -1,0 +1,30 @@
+{
+  "name": "dsh-stickers",
+  "version": "0.1.2",
+  "private": true,
+  "type": "module",
+  "description": "表情包收藏页：抖音 / 小红书 / 中文表情包库，抓取、勾选、批量导出并拖进微信",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true
+    }
+  }
+}

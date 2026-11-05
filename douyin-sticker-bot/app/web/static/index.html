@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>表情包 → 微信</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ffd84d'/%3E%3Ccircle cx='11' cy='13' r='3' fill='%23222'/%3E%3Ccircle cx='21' cy='13' r='3' fill='%23222'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <span class="logo">🙂</span>
+    <div>
+      <h1>表情包 → 微信</h1>
+      <p class="sub">抖音 · 小红书 · 中文表情包库　抓取 · 归一化 · 去重 · 批量导入</p>
+    </div>
+  </div>
+  <div class="chips">
+    <span class="chip" id="chip-login">登录：未检测</span>
+    <span class="chip" id="chip-count">候选：0</span>
+    <button class="chip-btn" id="btn-login">登录/检测</button>
+  </div>
+</header>
+
+<section class="panel">
+  <div class="mtabs" id="market-tabs" role="tablist"></div>
+  <div class="login-hint" id="login-hint" hidden>
+    <span>抖音要登录才能读到你的表情包：点右上角 <b>「登录/检测」</b>，在弹出来的浏览器里扫码、过一下滑块，然后回来再点一次检测。</span>
+  </div>
+  <div class="collect">
+    <select id="market" hidden>
+      <option value="douyin">抖音表情包</option>
+    </select>
+    <select id="mode">
+      <option value="sticker">我的表情包</option>
+      <option value="collection">我的收藏</option>
+      <option value="like">我点赞的</option>
+      <option value="keyword">关键词搜索</option>
+      <option value="user">账号主页</option>
+    </select>
+    <select id="category" hidden></select>
+    <div class="cat-picker" id="cat-picker" hidden>
+      <div class="cat-head">
+        <input id="cat-search" type="text" placeholder="搜索分类，比如 猫、悟空、奥特曼…">
+        <span class="cat-meta" id="cat-meta"></span>
+      </div>
+      <div class="cat-list" id="cat-list"></div>
+    </div>
+    <input id="query" type="text" placeholder="点「开始抓取」即可，不用填内容">
+    <button class="primary" id="btn-collect">开始抓取</button>
+    <button class="ghost" id="btn-refresh-manifest" hidden title="重新拉取来源清单">刷新清单</button>
+  </div>
+  <div class="progress-wrap">
+    <div class="bar"><div class="bar-fill" id="bar"></div></div>
+    <div class="progress-text" id="progress-text">空闲</div>
+  </div>
+  <div class="log" id="log"></div>
+</section>
+
+<section class="toolbar">
+  <div class="left">
+    <button id="btn-refresh" class="ghost">刷新</button>
+    <select id="filter">
+      <option value="new">待下载（默认）</option>
+      <option value="downloaded">已下载待导入</option>
+      <option value="imported">已导入</option>
+      <option value="duplicate">重复</option>
+      <option value="skipped">已跳过</option>
+      <option value="error">失败</option>
+      <option value="all">全部</option>
+    </select>
+    <select id="market-filter">
+      <option value="">全部来源</option>
+      <option value="douyin">抖音</option>
+    </select>
+    <button id="btn-all" class="ghost">全选本页</button>
+    <button id="btn-none" class="ghost">取消全选</button>
+    <button id="btn-clear-list" class="ghost danger" title="把当前筛选范围内的记录从列表里删掉（素材库里的文件不动）">清空列表</button>
+    <span class="counter" id="counter">已选 0</span>
+    <span class="pager">
+      <button id="btn-prev" class="ghost" title="上一页">‹</button>
+      <span id="pageinfo" class="pageinfo">0 / 0</span>
+      <button id="btn-next" class="ghost" title="下一页">›</button>
+    </span>
+  </div>
+  <div class="right">
+    <button class="ghost" id="btn-local">本地文件</button>
+    <button class="primary" id="btn-download">下载选中</button>
+    <button class="accent" id="btn-import">导入微信</button>
+  </div>
+</section>
+
+<main id="grid" class="grid"></main>
+<div id="empty" class="empty">还没有候选。上面选好抓取方式，点「开始抓取」。</div>
+
+<!-- 导入弹窗 -->
+<div class="mask" id="mask">
+  <div class="modal">
+    <h2>导入到微信表情</h2>
+    <p class="modal-sub">文件已经按顺序平铺到导出文件夹，并按微信顺序预览打开。</p>
+    <ol class="steps">
+      <li>在弹出的文件夹里 <b>Ctrl+A 全选</b> 所有图片</li>
+      <li>拖进微信任意聊天窗口的输入框 →「添加到表情」</li>
+      <li>回到这里点下面的按钮，标记为已导入</li>
+    </ol>
+    <div class="modal-info">
+      <span>已导出 <b id="imp-count">0</b> 个</span>
+      <code id="imp-path"></code>
+    </div>
+    <div class="modal-actions">
+      <button class="ghost" id="btn-imp-open">打开文件夹</button>
+      <button class="ghost" id="btn-imp-cancel">稍后</button>
+      <button class="primary" id="btn-imp-done">我已导入</button>
+    </div>
+  </div>
+</div>
+
+<div class="mask" id="local-mask">
+  <div class="modal wide">
+    <h2>本地文件</h2>
+    <p class="modal-sub">导出夹是准备拖进微信的那份；素材库是你下载过的全部原图。</p>
+
+    <div class="local-sec">
+      <div class="local-head">
+        <div>
+          <b>导出夹（拖进微信用的）</b>
+          <div class="local-meta">
+            <span id="loc-ob-count">0 个文件</span> ·
+            <span id="loc-ob-size">0 KB</span>
+          </div>
+          <code class="local-path" id="loc-ob-path"></code>
+        </div>
+        <div class="local-actions">
+          <button class="ghost" id="btn-loc-ob-open">打开文件夹</button>
+          <button class="ghost danger" id="btn-loc-ob-clear">清空导出夹</button>
+        </div>
+      </div>
+      <div class="loc-grid" id="loc-ob-grid"></div>
+      <div class="loc-empty" id="loc-ob-empty" hidden>导出夹是空的。点上面「导入微信」导出，或先把待下载的下载下来。</div>
+    </div>
+
+    <div class="local-sec">
+      <div class="local-head">
+        <div>
+          <b>素材库（下载过的原图）</b>
+          <div class="local-meta">
+            <span id="loc-lib-count">0 个文件</span> ·
+            <span id="loc-lib-size">0 MB</span> ·
+            已导入 <span id="loc-lib-imported">0</span> 个
+          </div>
+          <code class="local-path" id="loc-lib-path"></code>
+        </div>
+        <div class="local-actions">
+          <button class="ghost" id="btn-loc-lib-open">打开文件夹</button>
+          <button class="ghost" id="btn-loc-lib-orphan" title="删除没有任何记录引用的图片">清理孤儿文件</button>
+          <button class="ghost danger" id="btn-loc-lib-imported" title="删除已导入那批的原图，记录保留">删除已导入的原图</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="ghost" id="btn-loc-close">关闭</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

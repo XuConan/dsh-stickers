@@ -1,0 +1,6 @@
+- insert:
+    - id: dsh-stickers
+      name: 'dsh-stickers'
+      config:
+        port: 8799
+        autoStart: true

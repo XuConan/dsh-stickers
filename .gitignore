@@ -1,0 +1,18 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# 运行时数据：登录态、cookie、素材库、导出夹、数据库、清单缓存
+douyin-sticker-bot/data/
+
+# 构建产物
+dist/
+dsh-stickers/dist/
+node_modules/
+
+# 探针/测试留下的临时文件
+tmp*.json
+xhsprobe-*/

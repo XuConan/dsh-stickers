@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Stickers">
+  <rect x="4" y="4" width="56" height="56" rx="16" fill="#ffd84d"/>
+  <circle cx="24" cy="26" r="4.5" fill="#17191c"/>
+  <circle cx="42" cy="26" r="4.5" fill="#17191c"/>
+  <path d="M20 38c3.5 6 8.5 9 12 9s8.5-3 12-9" fill="none" stroke="#17191c" stroke-width="4.5" stroke-linecap="round"/>
+</svg>

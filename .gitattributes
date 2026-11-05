@@ -1,0 +1,11 @@
+# 让 Windows 批处理按字节原样保存：run.bat / install.bat 是 GBK + CRLF，
+# 一旦被 git 转成 LF 或 UTF-8，cmd.exe 就会报「不是内部或外部命令」。
+*.bat -text
+*.cmd -text
+
+# 图片、压缩包按二进制存
+*.jpg binary
+*.png binary
+*.svg text
+*.zip binary
+*.tgz binary

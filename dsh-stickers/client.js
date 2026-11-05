@@ -1,0 +1,326 @@
+/**
+ * Web half of the sticker bundle: a full page in the Harness Web UI.
+ *
+ * It renders inside the host's `main` slot (opened from the sidebar entry) and
+ * talks to the local sticker backend over HTTP, so the page shows the same
+ * library the standalone console does.
+ */
+window.__ModuleLoader__.load({
+  id: 'dsh-stickers',
+  factory(require) {
+    const React = require('react')
+    const h = React.createElement
+    const { useCallback, useEffect, useRef, useState } = React
+
+    const BASE = `http://127.0.0.1:${window.DSH_STICKERS_PORT || 8799}`
+    const PAGE = 60
+
+    async function api(path, init) {
+      const res = await fetch(`${BASE}${path}`, {
+        ...init,
+        headers: { 'Content-Type': 'application/json', ...(init && init.headers) },
+      })
+      const text = await res.text()
+      let body = null
+      try {
+        body = text ? JSON.parse(text) : null
+      } catch {
+        body = null
+      }
+      if (!res.ok) throw new Error((body && body.error) || `HTTP ${res.status}`)
+      return body
+    }
+
+    const STATUS = [
+      ['new', '待下载'],
+      ['downloaded', '已下载待导入'],
+      ['imported', '已导入'],
+      ['all', '全部'],
+    ]
+
+    function Page() {
+      const [markets, setMarkets] = useState([])
+      const [market, setMarket] = useState('douyin')
+      const [status, setStatus] = useState('new')
+      const [items, setItems] = useState([])
+      const [total, setTotal] = useState(0)
+      const [offset, setOffset] = useState(0)
+      const [sel, setSel] = useState(() => new Set())
+      const [msg, setMsg] = useState('')
+      const [busy, setBusy] = useState(false)
+      const [counts, setCounts] = useState({})
+      const alive = useRef(true)
+
+      useEffect(() => () => {
+        alive.current = false
+      }, [])
+
+      const loadMarkets = useCallback(async () => {
+        try {
+          const data = await api('/api/markets')
+          if (!alive.current) return
+          setMarkets((data && data.markets) || [])
+          const st = await api('/api/state')
+          if (!alive.current) return
+          setCounts((st && st.counts) || {})
+        } catch (err) {
+          if (alive.current) setMsg(`连不上表情包服务：${err.message}`)
+        }
+      }, [])
+
+      const load = useCallback(async () => {
+        try {
+          const qs = new URLSearchParams({
+            status,
+            limit: String(PAGE),
+            offset: String(offset),
+          })
+          if (market) qs.set('market', market)
+          const data = await api(`/api/candidates?${qs}`)
+          if (!alive.current) return
+          setItems(data.items || [])
+          setTotal(data.total || 0)
+        } catch (err) {
+          if (alive.current) setMsg(`加载失败：${err.message}`)
+        }
+      }, [market, status, offset])
+
+      useEffect(() => {
+        loadMarkets()
+      }, [loadMarkets])
+      useEffect(() => {
+        load()
+      }, [load])
+
+      const toggle = (id) => {
+        setSel((prev) => {
+          const next = new Set(prev)
+          if (next.has(id)) next.delete(id)
+          else next.add(id)
+          return next
+        })
+      }
+
+      const download = async () => {
+        const ids = [...sel]
+        if (!ids.length) {
+          setMsg('先勾选几个表情')
+          return
+        }
+        setBusy(true)
+        try {
+          const data = await api('/api/download', {
+            method: 'POST',
+            body: JSON.stringify({ ids }),
+          })
+          setMsg(`开始下载 ${data.started || 0} 个，完成后切到「已下载待导入」`)
+          setSel(new Set())
+          setStatus('downloaded')
+          setOffset(0)
+        } catch (err) {
+          setMsg(`下载失败：${err.message}`)
+        } finally {
+          setBusy(false)
+        }
+      }
+
+      const importToWechat = async () => {
+        setBusy(true)
+        try {
+          const data = await api('/api/import/prepare', { method: 'POST', body: '{}' })
+          await api('/api/open', { method: 'POST', body: JSON.stringify({ target: 'outbox' }) })
+          setMsg(`已平铺 ${data.count || 0} 个文件到 ${data.folder}，把它们拖进微信表情面板，再点「我已导入」`)
+        } catch (err) {
+          setMsg(`导入准备失败：${err.message}`)
+        } finally {
+          setBusy(false)
+        }
+      }
+
+      const markImported = async () => {
+        setBusy(true)
+        try {
+          const data = await api('/api/import/done', { method: 'POST', body: '{}' })
+          setMsg(`已标记 ${data.imported || 0} 个为已导入`)
+          setSel(new Set())
+          load()
+          loadMarkets()
+        } catch (err) {
+          setMsg(`标记失败：${err.message}`)
+        } finally {
+          setBusy(false)
+        }
+      }
+
+      const pages = Math.max(1, Math.ceil(total / PAGE))
+      const pageNo = Math.floor(offset / PAGE) + 1
+
+      return h(
+        'div',
+        { className: 'dshst-root' },
+        h(
+          'div',
+          { className: 'dshst-head' },
+          h('div', { className: 'dshst-title' }, '表情包收藏'),
+          h(
+            'div',
+            { className: 'dshst-tabs' },
+            markets.map((m) =>
+              h(
+                'button',
+                {
+                  key: m.id,
+                  className: `dshst-tab${m.id === market ? ' on' : ''}`,
+                  onClick: () => {
+                    setMarket(m.id)
+                    setOffset(0)
+                    setSel(new Set())
+                  },
+                },
+                m.name,
+                counts.by_market && counts.by_market[m.id]
+                  ? h('b', { className: 'n' }, counts.by_market[m.id])
+                  : null,
+              ),
+            ),
+          ),
+        ),
+        h(
+          'div',
+          { className: 'dshst-bar' },
+          h(
+            'select',
+            {
+              className: 'dshst-input',
+              value: status,
+              onChange: (e) => {
+                setStatus(e.target.value)
+                setOffset(0)
+              },
+            },
+            STATUS.map(([v, t]) => h('option', { key: v, value: v }, t)),
+          ),
+          h(
+            'button',
+            { className: 'dshst-btn', onClick: () => setSel(new Set(items.map((i) => i.id))) },
+            '全选本页',
+          ),
+          h('button', { className: 'dshst-btn', onClick: () => setSel(new Set()) }, '清空选择'),
+          h('span', { className: 'dshst-dim' }, `已选 ${sel.size}`),
+          h('span', { className: 'dshst-grow' }),
+          h(
+            'button',
+            { className: 'dshst-btn', disabled: busy, onClick: download },
+            `下载选中${sel.size ? `（${sel.size}）` : ''}`,
+          ),
+          h('button', { className: 'dshst-btn primary', disabled: busy, onClick: importToWechat }, '导入微信'),
+          h('button', { className: 'dshst-btn', disabled: busy, onClick: markImported }, '我已导入'),
+        ),
+        msg ? h('div', { className: 'dshst-msg' }, msg) : null,
+        h(
+          'div',
+          { className: 'dshst-grid' },
+          items.map((it) =>
+            h(
+              'div',
+              {
+                key: it.id,
+                className: `dshst-card${sel.has(it.id) ? ' on' : ''}`,
+                onClick: () => toggle(it.id),
+              },
+              h('img', { className: 'dshst-thumb', src: `${BASE}/api/thumb/${it.id}`, alt: '', loading: 'lazy' }),
+              h('div', { className: 'dshst-meta' }, it.desc || '抖音表情包'),
+              h(
+                'div',
+                { className: 'dshst-tags' },
+                h('span', { className: 'dshst-tag' }, it.is_animated ? 'GIF' : 'PNG'),
+                it.market && it.market !== 'douyin' ? h('span', { className: 'dshst-tag src' }, it.market) : null,
+                h('span', { className: 'dshst-tag' }, it.status),
+              ),
+            ),
+          ),
+          items.length ? null : h('div', { className: 'dshst-empty' }, '这里还没有表情。去「抖音」页抓一次，或在对话里让我抓。'),
+        ),
+        h(
+          'div',
+          { className: 'dshst-foot' },
+          h(
+            'button',
+            {
+              className: 'dshst-btn',
+              disabled: offset <= 0,
+              onClick: () => setOffset(Math.max(0, offset - PAGE)),
+            },
+            '‹ 上一页',
+          ),
+          h('span', { className: 'dshst-dim' }, `${pageNo} / ${pages} · 共 ${total}`),
+          h(
+            'button',
+            {
+              className: 'dshst-btn',
+              disabled: pageNo >= pages,
+              onClick: () => setOffset(offset + PAGE),
+            },
+            '下一页 ›',
+          ),
+        ),
+      )
+    }
+
+    function EntryIcon() {
+      return h('span', { className: 'dshst-icon', 'aria-hidden': true }, '🙂')
+    }
+
+    const CSS = `
+.dshst-root { display: flex; flex-direction: column; gap: 12px; height: 100%; padding: 16px 20px 20px; box-sizing: border-box; overflow: hidden; color: var(--dsw-alias-text-primary, #e7e9ee); }
+.dshst-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.dshst-title { font-size: 18px; font-weight: 600; }
+.dshst-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.dshst-tab { display: inline-flex; align-items: center; gap: 6px; padding: 7px 16px; border-radius: 999px; border: 1px solid var(--dsw-alias-border-base, #2c2f36); background: transparent; color: inherit; cursor: pointer; font: inherit; font-size: 13px; }
+.dshst-tab.on { background: #ffd84d; border-color: #ffd84d; color: #17191c; font-weight: 600; }
+.dshst-tab .n { font-size: 11px; opacity: .75; }
+.dshst-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dshst-grow { flex: 1 1 auto; }
+.dshst-dim { font-size: 12px; opacity: .65; }
+.dshst-input { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--dsw-alias-border-base, #2c2f36); background: var(--dsw-alias-bg-input, #1a1d22); color: inherit; font: inherit; font-size: 13px; }
+.dshst-btn { padding: 6px 12px; border-radius: 8px; border: 1px solid var(--dsw-alias-border-base, #2c2f36); background: transparent; color: inherit; font: inherit; font-size: 13px; cursor: pointer; }
+.dshst-btn:hover:not(:disabled) { background: rgba(255,255,255,.06); }
+.dshst-btn:disabled { opacity: .45; cursor: default; }
+.dshst-btn.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+.dshst-msg { padding: 8px 12px; border-radius: 8px; background: rgba(255,216,77,.1); border: 1px solid rgba(255,216,77,.35); font-size: 12.5px; }
+.dshst-grid { flex: 1 1 auto; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px; align-content: start; }
+.dshst-card { position: relative; border: 1px solid var(--dsw-alias-border-base, #2c2f36); border-radius: 10px; overflow: hidden; cursor: pointer; background: var(--dsw-alias-bg-card, #16191e); }
+.dshst-card.on { border-color: #ffd84d; box-shadow: 0 0 0 1px #ffd84d inset; }
+.dshst-thumb { display: block; width: 100%; aspect-ratio: 1/1; object-fit: contain; background: #0e1013; }
+.dshst-meta { padding: 6px 8px 0; font-size: 11.5px; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dshst-tags { display: flex; gap: 4px; padding: 6px 8px 8px; flex-wrap: wrap; }
+.dshst-tag { font-size: 10px; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--dsw-alias-border-base, #2c2f36); opacity: .8; }
+.dshst-tag.src { color: #ffd84d; border-color: #6b5a20; }
+.dshst-empty { grid-column: 1 / -1; padding: 40px; text-align: center; font-size: 13px; opacity: .55; }
+.dshst-foot { display: flex; align-items: center; gap: 10px; justify-content: center; }
+.dshst-icon { font-size: 18px; line-height: 1; }
+`
+
+    return {
+      inject: ['slots'],
+      apply(ctx) {
+        ctx.effect(() => {
+          const style = document.createElement('style')
+          style.dataset.plugin = 'dsh-stickers'
+          style.textContent = CSS
+          document.head.appendChild(style)
+          return () => style.remove()
+        })
+        ctx.slots.inject('main', function* registerPanel() {
+          yield ctx.slots.register({ name: 'main', key: 'stickers', order: 60 }, Page)
+        })
+        ctx.slots.inject('sidebar.panellist', () =>
+          ctx.slots.register(
+            { name: 'sidebar.panellist', id: 'stickers', order: 60, label: () => '表情包' },
+            EntryIcon,
+          ),
+        )
+      },
+    }
+  },
+})

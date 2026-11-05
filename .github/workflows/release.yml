@@ -1,0 +1,43 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 生成 install.bat（GBK + CRLF）
+        run: python dsh-stickers/scripts/make_install_bat.py
+
+      - name: 打便携包
+        run: python dsh-stickers/scripts/build-dist.py
+
+      - name: 校验产物
+        shell: pwsh
+        run: |
+          $zip = "dsh-stickers/dist/dsh-stickers-portable.zip"
+          if (-not (Test-Path $zip)) { throw "缺少 $zip" }
+          $bytes = [System.IO.File]::ReadAllBytes("dsh-stickers/install.bat")
+          if ($bytes[0] -ne 0x40) { throw "install.bat 头部不是 @echo off" }
+          $text = [System.Text.Encoding]::GetEncoding(936).GetString($bytes)
+          if ($text -notmatch "dsh plugin") { throw "install.bat 看起来不完整" }
+          Get-Item $zip | Select-Object Length, Name
+
+      - name: 上传到 Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dsh-stickers/dist/dsh-stickers-portable.zip
+          generate_release_notes: true
