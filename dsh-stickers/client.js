@@ -50,12 +50,29 @@ window.__ModuleLoader__.load({
       ['all', '全部'],
     ]
 
+    // 卡片右下角的状态徽标：未下载 / 已下载 / 已有
+    const STATUS_TEXT = {
+      new: '未下载',
+      downloaded: '已下载',
+      imported: '已有',
+      duplicate: '已有',
+      skipped: '跳过',
+      error: '出错',
+    }
+    const STATUS_CLASS = {
+      new: 'wait',
+      downloaded: 'dl',
+      imported: 'ok',
+      duplicate: 'ok',
+      skipped: 'skip',
+      error: 'err',
+    }
+
     function Page() {
       const [markets, setMarkets] = useState([])
       const [market, setMarket] = useState('douyin')
       const [status, setStatus] = useState('all')
       const [mode, setMode] = useState('sticker')
-      const [category, setCategory] = useState('')
       const [login, setLogin] = useState({})
       const [items, setItems] = useState([])
       const [total, setTotal] = useState(0)
@@ -199,28 +216,20 @@ window.__ModuleLoader__.load({
       const loggedIn = !!login[market]
 
       useEffect(() => {
-        if (isCatalog) {
-          if (cats.length && !cats.some((c) => c.id === category)) setCategory(cats[0].id)
-          return
-        }
         if (!modes.length) return
         if (!modes.some((m) => m.id === mode)) setMode(modes[0].id)
       }, [market, markets])
 
       const collect = async () => {
-        if (isCatalog && !category) {
-          setMsg('先选一个分类')
-          return
-        }
         if (needsLogin && !loggedIn && !(market === 'xhs' && mode === 'redmoji')) {
           setMsg(`先点右边「扫码登录」，${currentMarket ? currentMarket.name : ''}登录成功后再抓`)
           return
         }
         setBusy(true)
-        setMsg('已提交抓取，稍等…')
+        setMsg(isCatalog ? '正在重新拉整库（上次未下载的会被覆盖）…' : '已提交抓取，稍等…')
         const before = (counts && counts.total) || 0
         try {
-          const body = isCatalog ? { market, category } : { market, mode }
+          const body = isCatalog ? { market } : { market, mode }
           await api('/api/collect', { method: 'POST', body: JSON.stringify(body) })
           for (let i = 0; i < 40; i += 1) {
             await new Promise((r) => setTimeout(r, 1500))
@@ -316,23 +325,23 @@ window.__ModuleLoader__.load({
         h(
           'div',
           { className: 'dshst-bar' },
-          h(
-            'select',
-            {
-              className: 'dshst-input',
-              value: isCatalog ? category : mode,
-              onChange: (e) => {
-                if (isCatalog) setCategory(e.target.value)
-                else setMode(e.target.value)
-              },
-            },
-            (isCatalog
-              ? cats
-              : modes.length
-                ? modes
-                : [{ id: 'sticker', name: '我的表情包' }]
-            ).map((m) => h('option', { key: m.id, value: m.id }, m.name)),
-          ),
+          isCatalog
+            ? h(
+                'span',
+                { className: 'dshst-dim' },
+                `${currentMarket ? currentMarket.name : ''} · 整库 ${cats.reduce((n, c) => (c.id === '__all__' ? n : n + (c.count || 0)), 0)} 张`,
+              )
+            : h(
+                'select',
+                {
+                  className: 'dshst-input',
+                  value: mode,
+                  onChange: (e) => setMode(e.target.value),
+                },
+                (modes.length ? modes : [{ id: 'sticker', name: '我的表情包' }]).map((m) =>
+                  h('option', { key: m.id, value: m.id }, m.name),
+                ),
+              ),
           h('button', { className: 'dshst-btn primary', disabled: busy, onClick: collect }, '开始抓取'),
           needsLogin
             ? h('button', { className: 'dshst-btn', disabled: busy, onClick: doLogin }, loggedIn ? '检测' : '扫码登录')
@@ -388,14 +397,22 @@ window.__ModuleLoader__.load({
                 className: `dshst-card${sel.has(it.id) ? ' on' : ''}`,
                 onClick: () => toggle(it.id),
               },
-              h('img', { className: 'dshst-thumb', src: `${BASE}/api/thumb/${it.id}`, alt: '', loading: 'lazy' }),
+              h(
+                'div',
+                { className: 'dshst-photo' },
+                h('img', { className: 'dshst-thumb', src: `${BASE}/api/thumb/${it.id}`, alt: '', loading: 'lazy' }),
+                h(
+                  'span',
+                  { className: `dshst-badge ${STATUS_CLASS[it.status] || 'wait'}` },
+                  STATUS_TEXT[it.status] || it.status,
+                ),
+              ),
               h('div', { className: 'dshst-meta' }, it.desc || '抖音表情包'),
               h(
                 'div',
                 { className: 'dshst-tags' },
                 h('span', { className: 'dshst-tag' }, it.is_animated ? 'GIF' : 'PNG'),
                 it.market && it.market !== 'douyin' ? h('span', { className: 'dshst-tag src' }, it.market) : null,
-                h('span', { className: 'dshst-tag' }, it.status),
               ),
             ),
           ),
@@ -483,6 +500,17 @@ window.__ModuleLoader__.load({
 .dshst-card { position: relative; border: 1px solid var(--dsw-alias-border-base, #2c2f36); border-radius: 10px; overflow: hidden; cursor: pointer; background: var(--dsw-alias-bg-card, #16191e); }
 .dshst-card.on { border-color: #ffd84d; box-shadow: 0 0 0 1px #ffd84d inset; }
 .dshst-thumb { display: block; width: 100%; aspect-ratio: 1/1; object-fit: contain; background: #0e1013; }
+.dshst-photo { position: relative; display: block; }
+.dshst-badge {
+  position: absolute; right: 6px; bottom: 6px; padding: 1px 7px; border-radius: 999px;
+  font-size: 11px; line-height: 16px; background: rgba(0, 0, 0, .68);
+  border: 1px solid transparent; pointer-events: none;
+}
+.dshst-badge.wait { color: #ffd84d; border-color: #6b5a20; }
+.dshst-badge.dl { color: #7cc4ff; border-color: #2b5570; }
+.dshst-badge.ok { color: #6ee7a8; border-color: #25603f; }
+.dshst-badge.skip { color: #b9b9b9; border-color: #454545; }
+.dshst-badge.err { color: #ff8b8b; border-color: #6b2a2a; }
 .dshst-meta { padding: 6px 8px 0; font-size: 11.5px; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dshst-tags { display: flex; gap: 4px; padding: 6px 8px 8px; flex-wrap: wrap; }
 .dshst-tag { font-size: 10px; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--dsw-alias-border-base, #2c2f36); opacity: .8; }

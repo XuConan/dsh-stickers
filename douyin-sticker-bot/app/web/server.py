@@ -602,9 +602,7 @@ def make_handler(app: App):
                             self._json({"error": "没有这个来源"}, 400)
                             return
                         category = (body.get("category") or "").strip()
-                        if getattr(m, "kind", "catalog") == "catalog" and not category:
-                            self._json({"error": "请先选分类"}, 400)
-                            return
+                        # 不传分类 = 整个库；重复拉取时覆盖该来源「待下载」那批，避免越攒越多
                         if ingest.start(m, category=category, query=value,
                                         cfg=app.cfg, bus=app.bus):
                             self._json({"ok": True})

@@ -48,6 +48,12 @@ def _run(market: Market, category: str, query: str, cfg, bus: Bus | None,
     total = 0
     try:
         bus.emit("progress", phase="browse", count=0, msg="拉取清单…")
+        # 目录型市场重复拉取时覆盖上一次「未下载」那批，避免列表越攒越多；
+        # 已下载 / 已导入的记录保留（它们在界面上就是「已下载 / 已有」）。
+        if getattr(market, "kind", "catalog") == "catalog":
+            stale = store.delete_candidates(statuses=["new"], market=market.id, db=db)
+            if stale:
+                bus.emit("log", msg=f"{market.name}：清掉上次未下载的 {stale} 条，重新拉一遍")
         market.ensure_manifest()  # 首次会下载清单（约 25s），之后走缓存
         items = market.items(category=category or None, query=query or None, limit=20000)
         total = len(items)

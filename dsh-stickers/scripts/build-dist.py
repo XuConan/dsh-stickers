@@ -35,6 +35,8 @@ PLUGIN_FILES = [
     "locale/en.json",
 ]
 SKIP_DIRS = {".venv", "data", "__pycache__", ".git", ".pytest_cache", "node_modules"}
+# 探查脚本会在项目根留下 tmp*.json / tmp<rand>/ 垃圾，别打进包里
+SKIP_PREFIXES = ("tmp",)
 
 README_CN = """表情包 → 微信：DSH 插件（一次性安装包）
 
@@ -81,12 +83,12 @@ def build_portable(version: str) -> Path:
         for rel in PLUGIN_FILES:
             zf.write(ROOT / rel, f"dsh-stickers/{rel}")
         for base, dirs, files in os.walk(PROJECT):
-            dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+            dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.startswith(SKIP_PREFIXES)]
             for name in files:
                 if name.endswith(".pyc"):
                     continue
                 # 探查脚本偶尔会把临时 json 写进项目根，别打进包
-                if name.startswith("tmp") and name.endswith(".json"):
+                if name.startswith(SKIP_PREFIXES):
                     continue
                 full = Path(base) / name
                 rel = full.relative_to(PROJECT)
