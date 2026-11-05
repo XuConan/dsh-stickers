@@ -158,10 +158,15 @@ window.__ModuleLoader__.load({
           } catch {
             opened = false
           }
+          if (!opened) {
+            try {
+              await navigator.clipboard.writeText(data.folder || '')
+            } catch {}
+          }
           setMsg(
             opened
               ? `已平铺 ${data.count || 0} 个文件，把它们拖进微信表情面板，再点「我已导入」`
-              : `已平铺 ${data.count || 0} 个文件到 ${data.folder}。窗口没自动弹出来，自己打开这个目录，全选拖进微信`,
+              : `已平铺 ${data.count || 0} 个文件到 ${data.folder}。窗口没自动弹出来，路径已复制，粘到资源管理器地址栏打开，全选拖进微信`,
           )
         } catch (err) {
           setMsg(`导入准备失败：${err.message}`)
