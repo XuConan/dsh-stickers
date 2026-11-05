@@ -168,6 +168,7 @@ def get_candidate(cid: int, db: Optional[Path] = None) -> Optional[dict]:
 
 def delete_candidates(statuses: Optional[Iterable[str]] = None,
                       market: Optional[str] = None,
+                      desc: Optional[str] = None,
                       db: Optional[Path] = None) -> int:
     """删掉某个筛选范围内的候选记录（素材库里的文件不动）。返回删除条数。"""
     db = db or cfg_mod.load_config().db_path
@@ -180,6 +181,10 @@ def delete_candidates(statuses: Optional[Iterable[str]] = None,
     if market:
         where.append("market = ?")
         args.append(market)
+    if desc:
+        # 目录型来源的 desc 就是分类名，用它把「覆盖」限制在同一个分类里
+        where.append("desc = ?")
+        args.append(desc)
     if where:
         sql += " WHERE " + " AND ".join(where)
     with closing(_connect(db)) as conn:

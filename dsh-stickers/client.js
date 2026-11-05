@@ -73,6 +73,7 @@ window.__ModuleLoader__.load({
       const [market, setMarket] = useState('douyin')
       const [status, setStatus] = useState('all')
       const [mode, setMode] = useState('sticker')
+      const [category, setCategory] = useState('__all__')
       const [login, setLogin] = useState({})
       const [items, setItems] = useState([])
       const [total, setTotal] = useState(0)
@@ -216,20 +217,28 @@ window.__ModuleLoader__.load({
       const loggedIn = !!login[market]
 
       useEffect(() => {
+        if (isCatalog) {
+          if (cats.length && !cats.some((c) => c.id === category)) setCategory(cats[0].id)
+          return
+        }
         if (!modes.length) return
         if (!modes.some((m) => m.id === mode)) setMode(modes[0].id)
       }, [market, markets])
 
       const collect = async () => {
+        if (isCatalog && cats.length && !category) {
+          setMsg('先选一个分类')
+          return
+        }
         if (needsLogin && !loggedIn && !(market === 'xhs' && mode === 'redmoji')) {
           setMsg(`先点右边「扫码登录」，${currentMarket ? currentMarket.name : ''}登录成功后再抓`)
           return
         }
         setBusy(true)
-        setMsg(isCatalog ? '正在重新拉整库（上次未下载的会被覆盖）…' : '已提交抓取，稍等…')
+        setMsg(isCatalog ? '正在重新拉取（上次未下载的会被覆盖）…' : '已提交抓取，稍等…')
         const before = (counts && counts.total) || 0
         try {
-          const body = isCatalog ? { market } : { market, mode }
+          const body = isCatalog ? { market, category } : { market, mode }
           await api('/api/collect', { method: 'POST', body: JSON.stringify(body) })
           for (let i = 0; i < 40; i += 1) {
             await new Promise((r) => setTimeout(r, 1500))
@@ -327,9 +336,19 @@ window.__ModuleLoader__.load({
           { className: 'dshst-bar' },
           isCatalog
             ? h(
-                'span',
-                { className: 'dshst-dim' },
-                `${currentMarket ? currentMarket.name : ''} · 整库 ${cats.reduce((n, c) => (c.id === '__all__' ? n : n + (c.count || 0)), 0)} 张`,
+                'select',
+                {
+                  className: 'dshst-input',
+                  value: category,
+                  onChange: (e) => setCategory(e.target.value),
+                },
+                (cats.length ? cats : [{ id: '__all__', name: '全部表情包', count: 0 }]).map((c) =>
+                  h(
+                    'option',
+                    { key: c.id, value: c.id },
+                    c.id === '__all__' ? `${c.name}（${c.count}）` : `${c.number ? c.number + ' ' : ''}${c.name}（${c.count}）`,
+                  ),
+                ),
               )
             : h(
                 'select',
@@ -407,7 +426,8 @@ window.__ModuleLoader__.load({
                   STATUS_TEXT[it.status] || it.status,
                 ),
               ),
-              h('div', { className: 'dshst-meta' }, it.desc || '抖音表情包'),
+              // 分类名不再写在卡片上（选中哪个分类看上面的下拉就够了）
+              isCatalog ? null : h('div', { className: 'dshst-meta' }, it.desc || '表情包'),
               h(
                 'div',
                 { className: 'dshst-tags' },

@@ -162,6 +162,12 @@ class GithubRepoMarket:
             out.append(f)
         return out
 
+    def category_label(self, category: Optional[str]) -> str:
+        """分类 id → 卡片上显示的短名；「全部」或空返回空串。"""
+        if not category or category in (ALL_CATEGORY, "all"):
+            return ""
+        return pretty_name(category)
+
     def categories(self) -> list[dict]:
         buckets: dict[str, dict] = {}
         for f in self._files():
