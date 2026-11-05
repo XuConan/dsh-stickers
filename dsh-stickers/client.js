@@ -60,6 +60,7 @@ window.__ModuleLoader__.load({
       const [items, setItems] = useState([])
       const [total, setTotal] = useState(0)
       const [offset, setOffset] = useState(0)
+      const [jump, setJump] = useState('')
       const [sel, setSel] = useState(() => new Set())
       const [msg, setMsg] = useState('')
       const [busy, setBusy] = useState(false)
@@ -274,6 +275,13 @@ window.__ModuleLoader__.load({
 
       const pages = Math.max(1, Math.ceil(total / PAGE))
       const pageNo = Math.floor(offset / PAGE) + 1
+      const doJump = () => {
+        const n = parseInt(String(jump), 10)
+        if (!Number.isFinite(n)) return
+        const p = Math.min(pages, Math.max(1, n))
+        setOffset((p - 1) * PAGE)
+        setJump('')
+      }
 
       return h(
         'div',
@@ -413,7 +421,7 @@ window.__ModuleLoader__.load({
             },
             '‹ 上一页',
           ),
-          h('span', { className: 'dshst-dim' }, `${pageNo} / ${pages} · 共 ${total}`),
+          h('span', { className: 'dshst-dim' }, `第 ${pageNo} / ${pages} 页 · 共 ${total} 条`),
           h(
             'button',
             {
@@ -422,6 +430,29 @@ window.__ModuleLoader__.load({
               onClick: () => setOffset(offset + PAGE),
             },
             '下一页 ›',
+          ),
+          h('span', { className: 'dshst-dim' }, '跳到'),
+          h('input', {
+            className: 'dshst-jump',
+            type: 'number',
+            min: 1,
+            max: pages,
+            value: jump,
+            placeholder: String(pageNo),
+            onChange: (e) => setJump(e.target.value),
+            onKeyDown: (e) => {
+              if (e.key === 'Enter') doJump()
+            },
+          }),
+          h('button', { className: 'dshst-btn', onClick: doJump }, '页'),
+          h(
+            'button',
+            {
+              className: 'dshst-btn',
+              disabled: pageNo >= pages,
+              onClick: () => setOffset((pages - 1) * PAGE),
+            },
+            '末页 »',
           ),
         ),
       )
@@ -458,6 +489,9 @@ window.__ModuleLoader__.load({
 .dshst-tag.src { color: #ffd84d; border-color: #6b5a20; }
 .dshst-empty { grid-column: 1 / -1; padding: 40px; text-align: center; font-size: 13px; opacity: .55; }
 .dshst-foot { display: flex; align-items: center; gap: 10px; justify-content: center; }
+.dshst-jump { width: 64px; padding: 4px 8px; border-radius: 8px; text-align: center;
+  background: var(--dsw-alias-surface-2, #17191c); color: inherit;
+  border: 1px solid var(--dsw-alias-line, #2a2e33); font-size: 12px; }
 .dshst-icon { font-size: 18px; line-height: 1; }
 `
 
