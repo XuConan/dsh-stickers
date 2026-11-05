@@ -20,6 +20,14 @@ ZIP = ROOT / "dist" / "dsh-stickers-portable.zip"
 BAT = ROOT / "install.bat"
 PKG = ROOT / "package.json"
 
+# Windows CI runners default to a legacy console code page; printing Chinese
+# would raise UnicodeEncodeError and fail the step for the wrong reason.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:  # pragma: no cover - very old Python
+    pass
+
 
 def fail(message: str) -> None:
     print(f"[FAIL] {message}")
