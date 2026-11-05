@@ -25,15 +25,7 @@ jobs:
         run: python dsh-stickers/scripts/build-dist.py
 
       - name: 校验产物
-        shell: pwsh
-        run: |
-          $zip = "dsh-stickers/dist/dsh-stickers-portable.zip"
-          if (-not (Test-Path $zip)) { throw "缺少 $zip" }
-          $bytes = [System.IO.File]::ReadAllBytes("dsh-stickers/install.bat")
-          if ($bytes[0] -ne 0x40) { throw "install.bat 头部不是 @echo off" }
-          $text = [System.Text.Encoding]::GetEncoding(936).GetString($bytes)
-          if ($text -notmatch "dsh plugin") { throw "install.bat 看起来不完整" }
-          Get-Item $zip | Select-Object Length, Name
+        run: python dsh-stickers/scripts/verify_dist.py
 
       - name: 上传到 Release
         if: startsWith(github.ref, 'refs/tags/v')
