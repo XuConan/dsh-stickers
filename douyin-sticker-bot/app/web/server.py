@@ -175,6 +175,7 @@ class App:
                     or ingest.is_running() or xhs_sync.is_running(),
             "ingesting": ingest.is_running() or xhs_sync.is_running(),
             "outbox": pending,
+            "last_run": store.latest_run(),
             "paths": {
                 "stickers": str(self.cfg.stickers_dir),
                 "outbox": str(outbox),

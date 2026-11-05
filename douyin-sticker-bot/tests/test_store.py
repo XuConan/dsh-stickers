@@ -198,6 +198,24 @@ class TestMarketColumn(unittest.TestCase):
         self.assertEqual(
             store.count_candidates(["imported"], db=self.db), 1)
 
+    def test_latest_run_reports_stats(self):
+        store.init(self.db)
+        self.assertIsNone(store.latest_run(db=self.db))
+        rid = store.create_run("chinesebqb:001", "", db=self.db)
+        store.finish_run(rid, {"captured": 15, "new": 0}, db=self.db)
+        run = store.latest_run(db=self.db)
+        self.assertEqual(run["id"], rid)
+        self.assertEqual(run["mode"], "chinesebqb:001")
+        self.assertEqual(run["stats"]["captured"], 15)
+        self.assertEqual(run["stats"]["new"], 0)
+        # 取最近一条
+        rid2 = store.create_run("xhs:redmoji", "", db=self.db)
+        store.finish_run(rid2, {"captured": 166, "new": 3}, db=self.db)
+        self.assertEqual(store.latest_run(db=self.db)["stats"]["new"], 3)
+        # stats 坏数据不能炸
+        store.finish_run(rid2, {}, db=self.db)
+        self.assertEqual(store.latest_run(db=self.db)["stats"], {})
+
 
 if __name__ == "__main__":
     unittest.main()

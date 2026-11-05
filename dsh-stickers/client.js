@@ -229,13 +229,24 @@ window.__ModuleLoader__.load({
             setLogin((st && st.login) || {})
             if (!st.busy) {
               const now = (st.counts && st.counts.total) || 0
-              setMsg(
-                now > before
-                  ? `抓取完成：新增 ${now - before} 条，当前共 ${now} 条`
-                  : loggedIn
-                    ? '抓取完成，没有新增（这些已经都在库里了）'
-                    : '没抓到东西：先去上面「扫码登录」，登录后再点「开始抓取」',
-              )
+              const stLogin = (st.login && st.login[market]) || false
+              const mname = currentMarket ? currentMarket.name : ''
+              const run = (st.last_run && st.last_run.stats) || {}
+              const captured = typeof run.captured === 'number' ? run.captured : null
+              const added = typeof run.new === 'number' ? run.new : now - before
+              if (added > 0) {
+                setMsg(
+                  `抓取完成：新增 ${added} 条${captured ? `（这个分类共 ${captured} 条）` : ''}，库里共 ${now} 条`,
+                )
+              } else if (needsLogin && !stLogin) {
+                setMsg(`没抓到东西：先去上面「扫码登录」，${mname}登录后再点「开始抓取」`)
+              } else {
+                setMsg(
+                  captured
+                    ? `抓取完成：${mname} 这个分类共 ${captured} 条，都已经在库里了，没有新增`
+                    : '抓取完成，没有新增（这些已经都在库里了）',
+                )
+              }
               setOffset(0)
               load()
               return

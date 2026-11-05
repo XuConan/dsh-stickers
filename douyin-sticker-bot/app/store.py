@@ -264,6 +264,32 @@ def finish_run(run_id: int, stats: dict, db: Optional[Path] = None) -> None:
         conn.commit()
 
 
+def latest_run(db: Optional[Path] = None) -> Optional[dict]:
+    """最近一次抓取批次（含 stats），给界面显示「共 N 条 / 新增 M 条」用。"""
+    db = db or cfg_mod.load_config().db_path
+    with closing(_connect(db)) as conn:
+        row = conn.execute(
+            "SELECT id, mode, query, started_at, finished_at, stats"
+            " FROM runs ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+    if not row:
+        return None
+    stats = {}
+    if row["stats"]:
+        try:
+            stats = json.loads(row["stats"])
+        except (TypeError, ValueError):
+            stats = {}
+    return {
+        "id": row["id"],
+        "mode": row["mode"],
+        "query": row["query"],
+        "started_at": row["started_at"],
+        "finished_at": row["finished_at"],
+        "stats": stats,
+    }
+
+
 def get_setting(key: str, default=None, db: Optional[Path] = None):
     db = db or cfg_mod.load_config().db_path
     with closing(_connect(db)) as conn:

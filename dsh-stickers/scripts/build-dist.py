@@ -85,6 +85,9 @@ def build_portable(version: str) -> Path:
             for name in files:
                 if name.endswith(".pyc"):
                     continue
+                # 探查脚本偶尔会把临时 json 写进项目根，别打进包
+                if name.startswith("tmp") and name.endswith(".json"):
+                    continue
                 full = Path(base) / name
                 rel = full.relative_to(PROJECT)
                 zf.write(full, f"douyin-sticker-bot/{rel.as_posix()}")
