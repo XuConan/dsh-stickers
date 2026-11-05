@@ -53,7 +53,10 @@ window.__ModuleLoader__.load({
     function Page() {
       const [markets, setMarkets] = useState([])
       const [market, setMarket] = useState('douyin')
-      const [status, setStatus] = useState('new')
+      const [status, setStatus] = useState('all')
+      const [mode, setMode] = useState('sticker')
+      const [category, setCategory] = useState('')
+      const [login, setLogin] = useState({})
       const [items, setItems] = useState([])
       const [total, setTotal] = useState(0)
       const [offset, setOffset] = useState(0)
@@ -78,6 +81,7 @@ window.__ModuleLoader__.load({
           const st = await api('/api/state', undefined, { onWait: wait })
           if (!alive.current) return
           setCounts((st && st.counts) || {})
+          setLogin((st && st.login) || {})
           setMsg('')
         } catch (err) {
           if (alive.current) setMsg(`连不上表情包服务：${err.message}`)
@@ -168,6 +172,65 @@ window.__ModuleLoader__.load({
         }
       }
 
+      const currentMarket = markets.find((m) => m.id === market) || null
+      const modes = (currentMarket && currentMarket.modes) || []
+      const cats = (currentMarket && currentMarket.categories) || []
+      const isCatalog = !!(currentMarket && currentMarket.kind === 'catalog')
+      const needsLogin = !!(currentMarket && currentMarket.needs_login)
+      const loggedIn = !!login[market]
+
+      useEffect(() => {
+        if (isCatalog) {
+          if (cats.length && !cats.some((c) => c.id === category)) setCategory(cats[0].id)
+          return
+        }
+        if (!modes.length) return
+        if (!modes.some((m) => m.id === mode)) setMode(modes[0].id)
+      }, [market, markets])
+
+      const collect = async () => {
+        if (isCatalog && !category) {
+          setMsg('先选一个分类')
+          return
+        }
+        setBusy(true)
+        setMsg('已提交抓取，稍等…')
+        try {
+          const body = isCatalog ? { market, category } : { market, mode }
+          await api('/api/collect', { method: 'POST', body: JSON.stringify(body) })
+          for (let i = 0; i < 40; i += 1) {
+            await new Promise((r) => setTimeout(r, 1500))
+            const st = await api('/api/state')
+            if (!alive.current) return
+            setCounts((st && st.counts) || {})
+            setLogin((st && st.login) || {})
+            if (!st.busy) {
+              setMsg(`抓取完成，当前共 ${(st.counts && st.counts.total) || 0} 条`)
+              setOffset(0)
+              load()
+              return
+            }
+          }
+          setMsg('还在抓，过一会儿点「刷新」看看')
+        } catch (err) {
+          setMsg(`抓取失败：${err.message}`)
+        } finally {
+          if (alive.current) setBusy(false)
+        }
+      }
+
+      const doLogin = async () => {
+        setBusy(true)
+        try {
+          await api('/api/login', { method: 'POST', body: JSON.stringify({ market }) })
+          setMsg(`已打开${currentMarket ? currentMarket.name : ''}登录窗口：扫码后回来点一次「检测」`)
+        } catch (err) {
+          setMsg(`打开登录窗口失败：${err.message}`)
+        } finally {
+          if (alive.current) setBusy(false)
+        }
+      }
+
       const pages = Math.max(1, Math.ceil(total / PAGE))
       const pageNo = Math.floor(offset / PAGE) + 1
 
@@ -200,6 +263,38 @@ window.__ModuleLoader__.load({
               ),
             ),
           ),
+        ),
+        h(
+          'div',
+          { className: 'dshst-bar' },
+          h(
+            'select',
+            {
+              className: 'dshst-input',
+              value: isCatalog ? category : mode,
+              onChange: (e) => {
+                if (isCatalog) setCategory(e.target.value)
+                else setMode(e.target.value)
+              },
+            },
+            (isCatalog
+              ? cats
+              : modes.length
+                ? modes
+                : [{ id: 'sticker', name: '我的表情包' }]
+            ).map((m) => h('option', { key: m.id, value: m.id }, m.name)),
+          ),
+          h('button', { className: 'dshst-btn primary', disabled: busy, onClick: collect }, '开始抓取'),
+          needsLogin
+            ? h('button', { className: 'dshst-btn', disabled: busy, onClick: doLogin }, loggedIn ? '检测' : '扫码登录')
+            : null,
+          h(
+            'span',
+            { className: 'dshst-dim' },
+            needsLogin ? (loggedIn ? '已登录' : '未登录') : '免登录',
+          ),
+          h('span', { className: 'dshst-grow' }),
+          h('button', { className: 'dshst-btn', disabled: busy, onClick: () => { loadMarkets(); load() } }, '刷新'),
         ),
         h(
           'div',
@@ -255,7 +350,15 @@ window.__ModuleLoader__.load({
               ),
             ),
           ),
-          items.length ? null : h('div', { className: 'dshst-empty' }, '这里还没有表情。去「抖音」页抓一次，或在对话里让我抓。'),
+          items.length
+            ? null
+            : h(
+                'div',
+                { className: 'dshst-empty' },
+                needsLogin && !loggedIn
+                  ? `还没读到${currentMarket ? currentMarket.name : ''}的表情：先点上面「扫码登录」，登录后再点「开始抓取」。`
+                  : '这个筛选下没有表情，换个状态看看，或者点「开始抓取」。',
+              ),
         ),
         h(
           'div',
