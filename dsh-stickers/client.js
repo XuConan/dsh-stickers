@@ -148,12 +148,25 @@ window.__ModuleLoader__.load({
         setBusy(true)
         try {
           const data = await api('/api/import/prepare', { method: 'POST', body: '{}' })
-          await api('/api/open', { method: 'POST', body: JSON.stringify({ target: 'outbox' }) })
-          setMsg(`已平铺 ${data.count || 0} 个文件到 ${data.folder}，把它们拖进微信表情面板，再点「我已导入」`)
+          let opened = true
+          try {
+            const res = await api('/api/open', {
+              method: 'POST',
+              body: JSON.stringify({ target: 'outbox' }),
+            })
+            opened = !!(res && res.ok !== false)
+          } catch {
+            opened = false
+          }
+          setMsg(
+            opened
+              ? `已平铺 ${data.count || 0} 个文件，把它们拖进微信表情面板，再点「我已导入」`
+              : `已平铺 ${data.count || 0} 个文件到 ${data.folder}。窗口没自动弹出来，自己打开这个目录，全选拖进微信`,
+          )
         } catch (err) {
           setMsg(`导入准备失败：${err.message}`)
         } finally {
-          setBusy(false)
+          if (alive.current) setBusy(false)
         }
       }
 

@@ -1,6 +1,6 @@
 {
   "name": "dsh-stickers",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "private": true,
   "type": "module",
   "description": "表情包收藏页：抖音 / 小红书 / 中文表情包库，抓取、勾选、批量导出并拖进微信",

@@ -141,6 +141,25 @@ class App:
         self.hit_logged = False
 
     # ---------- 业务动作 ----------
+    def selftest(self) -> dict:
+        """能不能往自己的目录里写东西（被沙箱限制时会失败）。"""
+        out: dict = {"writable": True, "dirs": {}}
+        for name in ("tmp_dir", "outbox_dir", "stickers_dir"):
+            target = getattr(self.cfg, name)
+            item: dict = {"path": str(target)}
+            out["dirs"][name] = item
+            try:
+                target.mkdir(parents=True, exist_ok=True)
+                probe = target / ".dsh-stickers-probe"
+                probe.write_bytes(b"ok")
+                probe.unlink()
+                item["ok"] = True
+            except OSError as exc:
+                item["ok"] = False
+                item["error"] = f"{type(exc).__name__}: {exc}"
+                out["writable"] = False
+        return out
+
     def state(self) -> dict:
         c = store.counts()
         outbox = self.cfg.outbox_dir
@@ -459,6 +478,8 @@ def make_handler(app: App):
                     self._static(path[len("/static/"):])
                 elif path == "/api/state":
                     self._json(app.state())
+                elif path == "/api/selftest":
+                    self._json(app.selftest())
                 elif path == "/api/candidates":
                     qs = parse_qs(u.query)
                     # 默认只给「还没下载到本地」的：已下载/已导入的没必要再拉一遍
@@ -665,8 +686,13 @@ def make_handler(app: App):
                 elif path == "/api/open":
                     target = body.get("target", "stickers")
                     p = app.cfg.outbox_dir if target == "outbox" else app.cfg.stickers_dir
-                    open_outbox.open_folder(p)
-                    self._json({"ok": True})
+                    try:
+                        open_outbox.open_folder(p)
+                        self._json({"ok": True, "folder": str(p)})
+                    except Exception as exc:  # noqa: BLE001
+                        # 打开资源管理器被系统/沙箱拦住不算错，文件已经在盘上了
+                        self._json({"ok": False, "folder": str(p),
+                                    "error": f"{type(exc).__name__}: {exc}"})
                 else:
                     self._json({"error": "not found"}, 404)
             except (BrokenPipeError, ConnectionResetError):
