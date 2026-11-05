@@ -195,6 +195,7 @@ window.__ModuleLoader__.load({
         }
         setBusy(true)
         setMsg('已提交抓取，稍等…')
+        const before = (counts && counts.total) || 0
         try {
           const body = isCatalog ? { market, category } : { market, mode }
           await api('/api/collect', { method: 'POST', body: JSON.stringify(body) })
@@ -205,7 +206,14 @@ window.__ModuleLoader__.load({
             setCounts((st && st.counts) || {})
             setLogin((st && st.login) || {})
             if (!st.busy) {
-              setMsg(`抓取完成，当前共 ${(st.counts && st.counts.total) || 0} 条`)
+              const now = (st.counts && st.counts.total) || 0
+              setMsg(
+                now > before
+                  ? `抓取完成：新增 ${now - before} 条，当前共 ${now} 条`
+                  : loggedIn
+                    ? '抓取完成，没有新增（这些已经都在库里了）'
+                    : '没抓到东西：先去上面「扫码登录」，登录后再点「开始抓取」',
+              )
               setOffset(0)
               load()
               return
