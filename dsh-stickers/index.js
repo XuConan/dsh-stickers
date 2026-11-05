@@ -168,8 +168,9 @@ export async function apply(ctx, config = {}) {
     }
   }
 
-  async function startService() {
-    if (await healthy()) return
+  let starting = null
+
+  async function doStart() {
     if (!autoStart) {
       throw new Error(
         `表情包服务没在运行（${base}）。先启动 ${projectDir} 下的 run.bat，或把插件配置里的 autoStart 打开。`,
@@ -204,6 +205,15 @@ export async function apply(ctx, config = {}) {
       if (await healthy()) return
     }
     throw new Error(`表情包服务启动超时：${pythonPath()} -m app --port ${port}`)
+  }
+
+  async function startService() {
+    if (await healthy()) return
+    if (starting) return starting
+    starting = doStart().finally(() => {
+      starting = null
+    })
+    return starting
   }
 
   async function call(path, init) {
@@ -493,4 +503,11 @@ export async function apply(ctx, config = {}) {
       }),
     ),
   )
+
+  // 面板（client.js）直接 fetch 后端，不经过工具；这里先把它拉起来，面板一打开就有数据
+  if (autoStart) {
+    startService().catch((err) => {
+      console.warn('[dsh-stickers] 后台服务没能自动启动：', err && err.message ? err.message : err)
+    })
+  }
 }

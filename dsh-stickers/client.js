@@ -15,20 +15,32 @@ window.__ModuleLoader__.load({
     const BASE = `http://127.0.0.1:${window.DSH_STICKERS_PORT || 8799}`
     const PAGE = 60
 
-    async function api(path, init) {
-      const res = await fetch(`${BASE}${path}`, {
-        ...init,
-        headers: { 'Content-Type': 'application/json', ...(init && init.headers) },
-      })
-      const text = await res.text()
-      let body = null
-      try {
-        body = text ? JSON.parse(text) : null
-      } catch {
-        body = null
+    async function api(path, init, hooks) {
+      const method = (init && init.method) || 'GET'
+      const attempts = method === 'GET' ? 15 : 0
+      for (let attempt = 0; ; attempt += 1) {
+        let res
+        try {
+          res = await fetch(`${BASE}${path}`, {
+            ...init,
+            headers: { 'Content-Type': 'application/json', ...(init && init.headers) },
+          })
+        } catch (err) {
+          if (attempt >= attempts) throw err
+          if (hooks && hooks.onWait) hooks.onWait(attempt)
+          await new Promise((resolve) => setTimeout(resolve, 2000))
+          continue
+        }
+        const text = await res.text()
+        let body = null
+        try {
+          body = text ? JSON.parse(text) : null
+        } catch {
+          body = null
+        }
+        if (!res.ok) throw new Error((body && body.error) || `HTTP ${res.status}`)
+        return body
       }
-      if (!res.ok) throw new Error((body && body.error) || `HTTP ${res.status}`)
-      return body
     }
 
     const STATUS = [
@@ -56,13 +68,17 @@ window.__ModuleLoader__.load({
       }, [])
 
       const loadMarkets = useCallback(async () => {
+        const wait = () => {
+          if (alive.current) setMsg('正在启动表情包服务，请稍等…')
+        }
         try {
-          const data = await api('/api/markets')
+          const data = await api('/api/markets', undefined, { onWait: wait })
           if (!alive.current) return
           setMarkets((data && data.markets) || [])
-          const st = await api('/api/state')
+          const st = await api('/api/state', undefined, { onWait: wait })
           if (!alive.current) return
           setCounts((st && st.counts) || {})
+          setMsg('')
         } catch (err) {
           if (alive.current) setMsg(`连不上表情包服务：${err.message}`)
         }
