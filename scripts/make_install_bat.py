@@ -45,16 +45,22 @@ echo [1/3] dsh 命令: %DSHCLI%
 rem ---------------- 2/3 Python 环境 ----------------
 set "BACKEND=%HERE%\douyin-sticker-bot"
 if not exist "%BACKEND%\run.bat" set "BACKEND=%HERE%\..\douyin-sticker-bot"
-if not exist "%BACKEND%\run.bat" goto :nobackend
+if exist "%BACKEND%\run.bat" goto :mkpy
+echo [2/3] 没找到 Python 后端,跳过(插件首次启动时会自己装)
+goto :plugin
+
+:mkpy
 echo [2/3] 准备 Python 环境(首次约 1-2 分钟)...
 call "%BACKEND%\run.bat" --help >"%LOG%" 2>&1
-if errorlevel 1 goto :pythonfail
-echo       完成
+if errorlevel 1 echo       [!] 没装成功,插件首次启动时会再试一次,详见 %LOG%
+if not errorlevel 1 echo       完成
 
 rem ---------------- 3/3 装插件 ----------------
+:plugin
 echo [3/3] 安装插件到 profile "%PROFILE%" ...
-set "PLUGIN=%HERE%\dsh-stickers"
-if not exist "%PLUGIN%\package.json" set "PLUGIN=%HERE%"
+set "PLUGIN=%HERE%"
+if not exist "%PLUGIN%\package.json" set "PLUGIN=%HERE%\dsh-stickers"
+if not exist "%PLUGIN%\package.json" goto :noplugin
 call "%DSHCLI%" plugin --profile %PROFILE% add "%PLUGIN%"
 if errorlevel 1 goto :installfail
 
@@ -86,10 +92,10 @@ echo.
 pause
 exit /b 1
 
-:nobackend
+:noplugin
 echo.
-echo [X] 找不到 Python 后端,应该在 %HERE%\douyin-sticker-bot
-echo     请把整个 zip 完整解压(dsh-stickers / douyin-sticker-bot / install.bat 三个都要在)
+echo [X] 找不到插件本体(package.json),应该在 %HERE%
+echo     请把整个 zip 完整解压后再双击 install.bat
 echo.
 pause
 exit /b 1

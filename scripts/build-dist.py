@@ -48,6 +48,8 @@ README_CN = """表情包 → 微信：DSH 插件（一次性安装包）
   install.bat 依次做三件事：找 dsh 命令 → 建好 Python 环境 → 把插件装进
   desktop profile。要装到别的 profile：install.bat <profile名>
 
+  Python 环境没装成也不要紧：插件第一次启动会自己建 venv 装依赖。
+
   若提示没找到 dsh 命令：命令行里 set DSH_CLI=完整的dsh.cmd路径 后重跑。
 
 二、登录
@@ -57,13 +59,13 @@ README_CN = """表情包 → 微信：DSH 插件（一次性安装包）
 三、目录关系（插件靠这个找后端）
   sticker-kit\
     install.bat
-    dsh-stickers\           <- 插件本体
-    douyin-sticker-bot\     <- Python 后端（插件默认找它）
+    package.json / index.js / client.js ...   <- 插件本体（就在根目录）
+    douyin-sticker-bot\                       <- Python 后端（插件默认找它）
   把后端放到别处时，在 DSH 的 cordis.patch.yml 里给插件配 projectDir，
   或者设环境变量 DSH_STICKERS_PROJECT 指向它。
 
 四、要求
-  Windows + Python 3.10+（install.bat 会自动用 py/python 建 venv）。
+  Windows + Python 3.10+（没装依赖时插件会自己用 py/python 建 venv）。
   首次抓抖音/小红书会让浏览器装一次 Chrome，之后复用本机 Chrome。
 """
 
@@ -80,8 +82,10 @@ def read_version() -> str:
 def build_portable(version: str) -> Path:
     out = DIST / "dsh-stickers-portable.zip"
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
+        # 插件本体放在压缩包根目录：解压目录 / node_modules 装进来都能直接被
+        # index.js 里的 resolveProject() 找到旁边的 douyin-sticker-bot
         for rel in PLUGIN_FILES:
-            zf.write(ROOT / rel, f"dsh-stickers/{rel}")
+            zf.write(ROOT / rel, rel)
         for base, dirs, files in os.walk(PROJECT):
             dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.startswith(SKIP_PREFIXES)]
             for name in files:

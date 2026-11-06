@@ -1,0 +1,47 @@
+{
+  "name": "dsh-stickers",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "表情包收藏页：抖音 / 小红书 / 中文表情包库，抓取、勾选、批量下载，拖进微信即用",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/XuConan/dsh-stickers.git"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "dsh-bundle",
+    "stickers",
+    "douyin",
+    "xiaohongshu"
+  ],
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "douyin-sticker-bot/app",
+    "douyin-sticker-bot/tests",
+    "douyin-sticker-bot/run.bat",
+    "douyin-sticker-bot/requirements.txt",
+    "douyin-sticker-bot/README.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true
+    }
+  }
+}

@@ -17,7 +17,8 @@ window.__ModuleLoader__.load({
 
     async function api(path, init, hooks) {
       const method = (init && init.method) || 'GET'
-      const attempts = method === 'GET' ? 15 : 0
+      // 首次安装要现建 Python 环境（1-2 分钟），GET 先等 3 分钟再判失败
+      const attempts = method === 'GET' ? 90 : 0
       for (let attempt = 0; ; attempt += 1) {
         let res
         try {
@@ -95,8 +96,13 @@ window.__ModuleLoader__.load({
       }, [])
 
       const loadMarkets = useCallback(async () => {
-        const wait = () => {
-          if (alive.current) setMsg('正在启动表情包服务，请稍等…')
+        const wait = (n) => {
+          if (!alive.current) return
+          setMsg(
+            n >= 8
+              ? '第一次启动要先装 Python 依赖（约 1-2 分钟），装完这块会自动加载…'
+              : '正在启动表情包服务，请稍等…',
+          )
         }
         try {
           const data = await api('/api/markets', undefined, { onWait: wait })

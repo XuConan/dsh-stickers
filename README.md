@@ -20,28 +20,34 @@
 
 ## 安装
 
-### 方式一：一键包（推荐，给别人用）
+### 方式一：一条命令（推荐，给别人用）
+
+```bat
+dsh plugin --profile desktop add github:XuConan/dsh-stickers
+```
+
+装完重启 Harness 桌面应用。插件会自己找包里的 `douyin-sticker-bot`，**第一次启动时自动建 venv 装依赖**（约 1–2 分钟，面板会显示「第一次启动要先装 Python 依赖…」），装完自动加载。
+
+前提：本机有 Python 3.9+ 在 PATH 里；`dsh` 命令可用（DSH 装好后在 `resources\runtime\cli\bin\dsh.cmd`，没进 PATH 就用全路径）。
+
+### 方式二：一键包（离线/不想连 GitHub）
 
 从 [Releases](../../releases) 下载 `dsh-stickers-portable.zip` → 解压到固定目录（比如 `D:\sticker-kit`，**之后别挪、别删**）→ 双击 `install.bat` → 重启 Harness 桌面应用。
 
-`install.bat` 依次做三件事：找 `dsh` 命令 → 建好 Python 环境（首次 1–2 分钟）→ 把插件装进 `desktop` profile。装到别的 profile：`install.bat <profile名>`。
+`install.bat` 依次做三件事：找 `dsh` 命令 → 建好 Python 环境（首次 1–2 分钟）→ 把插件装进 `desktop` profile。装到别的 profile：`install.bat <profile名>`。Python 环境没装成也不影响使用，插件首次启动会自己补。
 
-### 方式二：从源码
+### 方式三：从源码改代码
 
 ```bat
 git clone <this-repo> dsh-stickers-repo
 cd dsh-stickers-repo
-:: 双击 dsh-stickers\install.bat（它会自己往上找 ..\douyin-sticker-bot 建环境）
-```
-
-或者手动两条命令：
-
-```bat
 douyin-sticker-bot\run.bat --help          :: 建 venv + 装依赖
-dsh plugin --profile desktop add dsh-stickers
+dsh plugin --profile desktop add .
 ```
 
-### 方式三：只要独立控制台（不装 DSH 插件）
+以后改完代码，重启 Harness 即可（`link:`/目录安装，不用重装）。
+
+### 方式四：只要独立控制台（不装 DSH 插件）
 
 ```bat
 cd douyin-sticker-bot
@@ -100,17 +106,21 @@ run.bat
 
 ```bat
 :: 测试（无需 pytest）
-.venv\Scripts\python.exe -m unittest discover -s tests -t .
+douyin-sticker-bot\.venv\Scripts\python.exe -m unittest discover -s tests -t .\douyin-sticker-bot
 :: 打安装包
-python dsh-stickers\scripts\make_install_bat.py   :: 生成 install.bat（GBK + CRLF）
-python dsh-stickers\scripts\build-dist.py         :: dist\*.tgz + dsh-stickers-portable.zip
+python scripts\make_install_bat.py   :: 生成 install.bat（GBK + CRLF）
+python scripts\build-dist.py         :: dist\*.tgz + dsh-stickers-portable.zip
 ```
 
-目录：
+目录（插件本体就在仓库根目录，这样 `dsh plugin add github:...` 能直接装）：
 
 ```
-dsh-stickers/          DSH 插件（Host: index.js / Client: client.js）
-douyin-sticker-bot/    Python 后端 + 独立控制台（app/、tests/）
+package.json / index.js / client.js    DSH 插件（Host: index.js / Client: client.js）
+cordis.patch.yml / locale / icon.svg   插件清单与文案
+install.bat                            一键安装（便携包用）
+scripts/                               打包、校验、面板离线渲染
+douyin-sticker-bot/                    Python 后端 + 独立控制台（app/、tests/）
+docs/screenshots/                      README 用的截图
 ```
 
 要求：Windows 10/11、Python 3.10+；装 Chrome 或 Edge（Playwright 用本机浏览器，不下载 Chromium）。

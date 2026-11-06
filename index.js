@@ -6,7 +6,7 @@
  * `client.js` and talks to the same local HTTP API.
  */
 import { spawn } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, openSync, closeSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -157,6 +157,133 @@ export async function apply(ctx, config = {}) {
       ? join(projectDir, '.venv', 'Scripts', 'python.exe')
       : join(projectDir, '.venv', 'bin', 'python'))
 
+  /** One child process, output appended to data/setup.log, resolves with its exit code. */
+  function run(cmd, args, logFd) {
+    return new Promise((resolve) => {
+      let settled = false
+      const done = (value) => {
+        if (!settled) {
+          settled = true
+          resolve(value)
+        }
+      }
+      let proc
+      try {
+        proc = spawn(cmd, args, {
+          cwd: projectDir,
+          windowsHide: true,
+          stdio: ['ignore', logFd, logFd],
+        })
+      } catch (err) {
+        done({ code: -1, error: err })
+        return
+      }
+      proc.on('error', (err) => done({ code: -1, error: err }))
+      proc.on('exit', (code) => done({ code }))
+    })
+  }
+
+  let pythonReady = null
+
+  /**
+   * Make sure `<project>/.venv` exists with the backend's dependencies.
+   *
+   * An install straight from a Git URL (or the portable zip) has no virtualenv,
+   * so build one once: `venv --without-pip` first because plain `venv` trips over
+   * a sandboxed ensurepip, then bootstrap pip and install requirements.
+   */
+  async function ensurePython() {
+    const target = pythonPath()
+    if (existsSync(target)) return target
+    if (config.pythonPath || process.env.DSH_STICKERS_PYTHON) return target
+    if (pythonReady) return pythonReady
+
+    pythonReady = (async () => {
+      const dataDir = join(projectDir, 'data')
+      mkdirSync(dataDir, { recursive: true })
+      const logPath = join(dataDir, 'setup.log')
+      const say = (line) => {
+        const text = `[${new Date().toISOString()}] ${line}\n`
+        try {
+          appendFileSync(logPath, text, 'utf8')
+        } catch {}
+        console.warn('[dsh-stickers]', line)
+      }
+      const logFd = openSync(logPath, 'a')
+      try {
+        say(`准备 Python 环境（${projectDir}），日志：${logPath}`)
+        const candidates =
+          process.platform === 'win32'
+            ? [
+                ['python', []],
+                ['py', ['-3']],
+              ]
+            : [
+                ['python3', []],
+                ['python', []],
+              ]
+        let system = null
+        for (const [cmd, prefix] of candidates) {
+          const probe = await run(cmd, [...prefix, '-c', 'import sys; print(sys.version)'], logFd)
+          if (probe.code === 0) {
+            system = { cmd, prefix }
+            break
+          }
+        }
+        if (!system) {
+          throw new Error(
+            `没找到 Python。装一个 Python 3.9+ 并把它加进 PATH，然后重启 Harness。（日志：${logPath}）`,
+          )
+        }
+        const venvDir = join(projectDir, '.venv')
+        let made = await run(system.cmd, [...system.prefix, '-m', 'venv', '--without-pip', venvDir], logFd)
+        if (made.code !== 0) {
+          say('venv --without-pip 失败，改用普通 venv')
+          made = await run(system.cmd, [...system.prefix, '-m', 'venv', venvDir], logFd)
+        }
+        if (!existsSync(target)) {
+          closeSync(logFd)
+          throw new Error(`建虚拟环境失败（${venvDir}）。日志：${logPath}`)
+        }
+        say('安装 pip')
+        await run(target, ['-m', 'ensurepip', '--upgrade'], logFd)
+        say('安装依赖（playwright / pillow / requests，约 1-2 分钟）')
+        let pip = await run(target, ['-m', 'pip', 'install', '-r', 'requirements.txt', '--disable-pip-version-check'], logFd)
+        if (pip.code !== 0) {
+          say('默认源失败，改用清华镜像重试')
+          pip = await run(
+            target,
+            [
+              '-m',
+              'pip',
+              'install',
+              '-r',
+              'requirements.txt',
+              '--disable-pip-version-check',
+              '-i',
+              'https://pypi.tuna.tsinghua.edu.cn/simple/',
+            ],
+            logFd,
+          )
+        }
+        closeSync(logFd)
+        if (pip.code !== 0) {
+          throw new Error(`安装依赖失败。日志：${logPath}`)
+        }
+        say('Python 环境就绪')
+        return target
+      } catch (err) {
+        try {
+          closeSync(logFd)
+        } catch {}
+        throw err
+      } finally {
+        pythonReady = null
+      }
+    })()
+    return pythonReady
+  }
+
   async function healthy() {
     try {
       const res = await fetch(`${base}/api/state`, {
@@ -182,8 +309,9 @@ export async function apply(ctx, config = {}) {
       )
     }
     if (child) return
+    const python = await ensurePython()
     let spawnError = null
-    child = spawn(pythonPath(), ['-m', 'app', '--no-browser', '--port', String(port)], {
+    child = spawn(python, ['-m', 'app', '--no-browser', '--port', String(port)], {
       cwd: projectDir,
       windowsHide: true,
       stdio: 'ignore',
@@ -199,12 +327,12 @@ export async function apply(ctx, config = {}) {
       await sleep(250)
       if (spawnError) {
         throw new Error(
-          `启动 Python 失败（${pythonPath()}）：${spawnError.message}。先在 ${projectDir} 里双击一次 run.bat 把环境装好。`,
+          `启动 Python 失败（${python}）：${spawnError.message}。看 ${join(projectDir, 'data', 'setup.log')}。`,
         )
       }
       if (await healthy()) return
     }
-    throw new Error(`表情包服务启动超时：${pythonPath()} -m app --port ${port}`)
+    throw new Error(`表情包服务启动超时：${python} -m app --port ${port}`)
   }
 
   async function startService() {

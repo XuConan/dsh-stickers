@@ -60,20 +60,27 @@ def main() -> int:
         names = zf.namelist()
         required = [
             "install.bat",
-            "dsh-stickers/index.js",
-            "dsh-stickers/package.json",
+            "index.js",
+            "package.json",
+            "client.js",
+            "cordis.patch.yml",
             "douyin-sticker-bot/app/__main__.py",
             "douyin-sticker-bot/run.bat",
         ]
         for name in required:
             if name not in names:
                 fail(f"便携包里缺少 {name}")
-        plugin_version = json.loads(zf.read("dsh-stickers/package.json"))["version"]
+        plugin_version = json.loads(zf.read("package.json"))["version"]
         if plugin_version != version:
             fail(f"包里插件版本 {plugin_version} 与 package.json {version} 不一致")
-        index = zf.read("dsh-stickers/index.js").decode("utf-8")
+        index = zf.read("index.js").decode("utf-8")
         if "resolveDefineTool" not in index:
             fail("包里的 index.js 是旧版（仍静态依赖 @deepseek-ai/dsh-tools）")
+        if "ensurePython" not in index:
+            fail("包里的 index.js 是旧版（不会自己建 Python 环境）")
+        pkg = json.loads(zf.read("package.json"))
+        if not (pkg.get("dsh") or {}).get("bundle"):
+            fail("package.json 缺少 dsh.bundle，装进去也不会加载")
     print(f"[ok] {ZIP.name} {ZIP.stat().st_size / 1024:.1f} KB，{len(names)} 个条目，插件 {version}")
     return 0
 
