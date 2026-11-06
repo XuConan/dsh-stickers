@@ -490,6 +490,8 @@ def make_handler(app: App):
                     market = (qs.get("market", [""])[0] or "").strip() or None
                     if market in ("", "all"):
                         market = None
+                    # 目录型来源按分类过滤：desc 存的就是分类短名
+                    desc = (qs.get("desc", [""])[0] or "").strip() or None
                     # 分页：默认一页 60，最多 400（6000 条全渲染会卡）
                     try:
                         limit = int(qs.get("limit", ["60"])[0])
@@ -502,10 +504,10 @@ def make_handler(app: App):
                         offset = 0
                     offset = max(0, offset)
                     total = store.count_candidates(statuses or None,
-                                                   market=market)
+                                                   market=market, desc=desc)
                     items = store.list_candidates(statuses or None,
                                                   limit=limit, market=market,
-                                                  offset=offset)
+                                                  offset=offset, desc=desc)
                     for it in items:
                         it.pop("sha256", None)
                     self._json({"items": items, "total": total,

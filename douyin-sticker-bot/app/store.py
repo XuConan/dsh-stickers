@@ -117,9 +117,13 @@ def add_candidate(item: dict, status: str = "new",
 
 def list_candidates(statuses: Optional[Iterable[str]] = None,
                     limit: int = 500, market: Optional[str] = None,
-                    offset: int = 0,
+                    offset: int = 0, desc: Optional[str] = None,
                     db: Optional[Path] = None) -> list[dict]:
-    """按状态/来源取候选，id 倒序；limit + offset 就是分页。"""
+    """按状态/来源/分类取候选，id 倒序；limit + offset 就是分页。
+
+    目录型来源（ChineseBQB 之类）没有「作品」概念，用 desc 存分类短名，
+    所以按分类筛就是 desc 相等。
+    """
     db = db or cfg_mod.load_config().db_path
     sql = "SELECT * FROM candidates"
     where, args = [], []
@@ -130,6 +134,9 @@ def list_candidates(statuses: Optional[Iterable[str]] = None,
     if market:
         where.append("market = ?")
         args.append(market)
+    if desc:
+        where.append("desc = ?")
+        args.append(desc)
     if where:
         sql += " WHERE " + " AND ".join(where)
     sql += " ORDER BY id DESC LIMIT ? OFFSET ?"
@@ -141,6 +148,7 @@ def list_candidates(statuses: Optional[Iterable[str]] = None,
 
 def count_candidates(statuses: Optional[Iterable[str]] = None,
                      market: Optional[str] = None,
+                     desc: Optional[str] = None,
                      db: Optional[Path] = None) -> int:
     """和 list_candidates 同样的筛选条件下有多少条（给分页算总页数）。"""
     db = db or cfg_mod.load_config().db_path
@@ -153,6 +161,9 @@ def count_candidates(statuses: Optional[Iterable[str]] = None,
     if market:
         where.append("market = ?")
         args.append(market)
+    if desc:
+        where.append("desc = ?")
+        args.append(desc)
     if where:
         sql += " WHERE " + " AND ".join(where)
     with closing(_connect(db)) as conn:
