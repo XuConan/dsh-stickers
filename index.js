@@ -7,6 +7,7 @@
  */
 import { spawn } from 'node:child_process'
 import { appendFileSync, existsSync, mkdirSync, openSync, closeSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -128,6 +129,16 @@ function resolveProject(override) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
+/**
+ * Where the backend keeps sqlite / 素材 / 登录态。装进 profile 的 `node_modules`
+ * 时会被 pnpm 覆盖，所以那种情况统一落到 `~/.dsh/dsh-stickers-data`。
+ */
+function defaultDataDir(project) {
+  const parts = project.split(/[\\/]+/)
+  if (!parts.includes('node_modules')) return join(project, 'data')
+  return join(homedir(), '.dsh', 'dsh-stickers-data')
+}
+
 /** Trim a stored candidate row down to what the model needs. */
 function brief(item) {
   return {
@@ -147,6 +158,7 @@ export async function apply(ctx, config = {}) {
   const projectDir = resolveProject(config.projectDir)
   const port = Number(config.port || 8799)
   const autoStart = config.autoStart !== false
+  const dataDir = config.dataDir || process.env.DSH_STICKERS_DATA || defaultDataDir(projectDir)
   const base = `http://127.0.0.1:${port}`
   let child = null
 
@@ -199,7 +211,6 @@ export async function apply(ctx, config = {}) {
     if (pythonReady) return pythonReady
 
     pythonReady = (async () => {
-      const dataDir = join(projectDir, 'data')
       mkdirSync(dataDir, { recursive: true })
       const logPath = join(dataDir, 'setup.log')
       const say = (line) => {
@@ -315,6 +326,7 @@ export async function apply(ctx, config = {}) {
       cwd: projectDir,
       windowsHide: true,
       stdio: 'ignore',
+      env: { ...process.env, DSH_STICKERS_DATA: dataDir },
     })
     child.on('exit', () => {
       child = null

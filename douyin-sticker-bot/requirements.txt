@@ -1,5 +1,6 @@
+# Runtime dependencies of the sticker backend (Windows: run run.bat once).
 playwright>=1.44.0
 Pillow>=10.3.0
 requests>=2.31.0
-# 可选：抓视频作品并转 GIF（不装也能用，视频作品会被跳过）
+# Optional: turn video posts into GIFs (skip it and video posts are ignored)
 # imageio-ffmpeg>=0.5.1

@@ -2,11 +2,15 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, asdict, fields
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DATA_DIR = ROOT / "data"
+# 插件从 GitHub 装进 node_modules 时，代码目录会被 pnpm 覆盖；DSH 插件会通过
+# 这个环境变量把数据挪到用户目录，避免重装丢素材/登录态。
+_DATA_ENV = os.environ.get("DSH_STICKERS_DATA", "").strip()
+DATA_DIR = Path(_DATA_ENV).expanduser() if _DATA_ENV else ROOT / "data"
 CONFIG_FILE = DATA_DIR / "config.json"
 
 
