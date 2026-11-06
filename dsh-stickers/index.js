@@ -459,46 +459,26 @@ export async function apply(ctx, config = {}) {
   ctx.effect(() =>
     ctx.tools.register(
       defineTool({
-        name: 'stickers_import',
+        name: 'stickers_folder',
         description:
-          '把已下载的表情平铺到导出夹（001.png 这样的文件名）并返回目录，用户把这些文件拖进微信表情面板即可。导入完成后调用 stickers_mark_imported。',
+          '返回下载目录（素材库）的绝对路径；导入微信由用户手动拖进表情面板，工具不做自动导入。',
         parameters: {},
         output: {
           schema: {
             type: 'object',
             additionalProperties: false,
             properties: {
-              count: { type: 'number', required: true, description: '平铺的文件数' },
-              folder: { type: 'string', required: true, description: '导出夹绝对路径' },
+              folder: { type: 'string', required: true, description: '下载目录绝对路径' },
+              opened: { type: 'boolean', required: true, description: '是否成功弹出资源管理器' },
             },
           },
         },
         execute: async () => {
-          const data = await call('/api/import/prepare', { method: 'POST', body: '{}' })
-          return { count: data.count || 0, folder: data.folder || '' }
-        },
-      }),
-    ),
-  )
-
-  ctx.effect(() =>
-    ctx.tools.register(
-      defineTool({
-        name: 'stickers_mark_imported',
-        description: '用户把导出夹里的文件拖进微信之后调用：把这批标记为已导入并清空导出夹。',
-        parameters: {},
-        output: {
-          schema: {
-            type: 'object',
-            additionalProperties: false,
-            properties: {
-              imported: { type: 'number', required: true, description: '标记为已导入的条数' },
-            },
-          },
-        },
-        execute: async () => {
-          const data = await call('/api/import/done', { method: 'POST', body: '{}' })
-          return { imported: data.imported || 0 }
+          const data = await call('/api/open', {
+            method: 'POST',
+            body: JSON.stringify({ target: 'stickers' }),
+          })
+          return { folder: data.folder || '', opened: !!data.ok }
         },
       }),
     ),

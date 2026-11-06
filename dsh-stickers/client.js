@@ -43,29 +43,34 @@ window.__ModuleLoader__.load({
       }
     }
 
+    // 只有「未下载 / 已下载」两态：到微信全是手动拖，这里不做导入流程
     const STATUS = [
-      ['new', '待下载'],
-      ['downloaded', '已下载待导入'],
-      ['imported', '已导入'],
       ['all', '全部'],
+      ['new', '未下载'],
+      ['downloaded', '已下载'],
     ]
 
-    // 卡片右下角的状态徽标：未下载 / 已下载 / 已有
     const STATUS_TEXT = {
       new: '未下载',
       downloaded: '已下载',
-      imported: '已有',
-      duplicate: '已有',
+      imported: '已下载',
+      duplicate: '已下载',
       skipped: '跳过',
       error: '出错',
     }
     const STATUS_CLASS = {
       new: 'wait',
       downloaded: 'dl',
-      imported: 'ok',
-      duplicate: 'ok',
+      imported: 'dl',
+      duplicate: 'dl',
       skipped: 'skip',
       error: 'err',
+    }
+    // 「已下载」这个筛选项要把历史上标成 imported/duplicate 的也算进去
+    const STATUS_QUERY = {
+      all: 'all',
+      new: 'new',
+      downloaded: 'downloaded,imported,duplicate',
     }
 
     function Page() {
@@ -110,7 +115,7 @@ window.__ModuleLoader__.load({
       const load = useCallback(async () => {
         try {
           const qs = new URLSearchParams({
-            status,
+            status: STATUS_QUERY[status] || status,
             limit: String(PAGE),
             offset: String(offset),
           })
@@ -180,49 +185,26 @@ window.__ModuleLoader__.load({
         }
       }
 
-      const importToWechat = async () => {
+      const openFolder = async () => {
         setBusy(true)
         try {
-          const data = await api('/api/import/prepare', { method: 'POST', body: '{}' })
-          let opened = true
-          try {
-            const res = await api('/api/open', {
-              method: 'POST',
-              body: JSON.stringify({ target: 'outbox' }),
-            })
-            opened = !!(res && res.ok !== false)
-          } catch {
-            opened = false
-          }
-          if (!opened) {
+          const res = await api('/api/open', { method: 'POST', body: JSON.stringify({ target: 'stickers' }) })
+          const folder = (res && res.folder) || ''
+          const opened = !!(res && res.ok !== false)
+          if (!opened && folder) {
             try {
-              await navigator.clipboard.writeText(data.folder || '')
+              await navigator.clipboard.writeText(folder)
             } catch {}
           }
           setMsg(
             opened
-              ? `已平铺 ${data.count || 0} 个文件，把它们拖进微信表情面板，再点「我已导入」`
-              : `已平铺 ${data.count || 0} 个文件到 ${data.folder}。窗口没自动弹出来，路径已复制，粘到资源管理器地址栏打开，全选拖进微信`,
+              ? `已打开下载文件夹：${folder}`
+              : `窗口没能自动弹出来，路径已复制：${folder}（粘到资源管理器地址栏即可）`,
           )
         } catch (err) {
-          setMsg(`导入准备失败：${err.message}`)
+          setMsg(`打不开文件夹：${err.message}`)
         } finally {
           if (alive.current) setBusy(false)
-        }
-      }
-
-      const markImported = async () => {
-        setBusy(true)
-        try {
-          const data = await api('/api/import/done', { method: 'POST', body: '{}' })
-          setMsg(`已标记 ${data.imported || 0} 个为已导入`)
-          setSel(new Set())
-          load()
-          loadMarkets()
-        } catch (err) {
-          setMsg(`标记失败：${err.message}`)
-        } finally {
-          setBusy(false)
         }
       }
 
@@ -418,11 +400,19 @@ window.__ModuleLoader__.load({
           h('span', { className: 'dshst-grow' }),
           h(
             'button',
-            { className: 'dshst-btn', disabled: busy, onClick: download },
+            { className: 'dshst-btn primary', disabled: busy, onClick: download },
             `下载选中${sel.size ? `（${sel.size}）` : ''}`,
           ),
-          h('button', { className: 'dshst-btn primary', disabled: busy, onClick: importToWechat }, '导入微信'),
-          h('button', { className: 'dshst-btn', disabled: busy, onClick: markImported }, '我已导入'),
+          h(
+            'button',
+            {
+              className: 'dshst-btn',
+              disabled: busy,
+              title: '下载好的图都在这里，全选拖进微信表情面板即可',
+              onClick: openFolder,
+            },
+            '打开下载文件夹',
+          ),
         ),
         msg ? h('div', { className: 'dshst-msg' }, msg) : null,
         h(
@@ -472,7 +462,7 @@ window.__ModuleLoader__.load({
                           ? isCatalog && cats.length && category !== '__all__'
                             ? '这个分类下还没有表情，点「开始抓取」拉一次。'
                             : '这里还没有表情，点「开始抓取」拉一次。'
-                          : '这个状态下是空的——它们可能还在下载，或者已经导进微信了。',
+                          : '这个状态下没有——切到「全部」看看，或者点「开始抓取」拉一批。',
                       ),
                       status === 'all'
                         ? null

@@ -4,16 +4,15 @@
 
 ## 它做什么
 
-- **Host 半边**（`index.js`）：按需拉起本地 Python 服务（`douyin-sticker-bot`），并注册 6 个工具：
+- **Host 半边**（`index.js`）：按需拉起本地 Python 服务（`douyin-sticker-bot`），并注册 5 个工具：
   | 工具 | 用途 |
   | --- | --- |
   | `stickers_collect` | 抓取（抖音 `sticker/collection/like/keyword/user`、小红书 `smiles/redmoji`、目录库 `chinesebqb` + 分类） |
   | `stickers_markets` | 列来源、抓取方式、登录状态、分类清单 |
   | `stickers_list` | 查候选（状态 / 来源 / 分页） |
   | `stickers_download` | 下载并归一化成 240×240 PNG/GIF + 查重 |
-  | `stickers_import` | 平铺到导出夹，返回目录 |
-  | `stickers_mark_imported` | 标记已导入并清空导出夹 |
-- **Client 半边**（`client.js`）：Harness Web UI 里的一个整页面板（`main` 槽），页签切来源、筛选、勾选、下载、导入，样式走 `--dsw-alias-*` 主题 token。
+  | `stickers_folder` | 返回下载目录（素材库）路径并尝试弹出资源管理器 |
+- **Client 半边**（`client.js`）：Harness Web UI 里的一个整页面板（`main` 槽），页签切来源、筛选（全部 / 未下载 / 已下载）、勾选、下载、打开下载文件夹。**不做导入微信**：下载好的图在素材库里，用户自己全选拖进微信表情面板，所以只有「未下载 / 已下载」两态，样式走 `--dsw-alias-*` 主题 token。
 
 ## 依赖
 
