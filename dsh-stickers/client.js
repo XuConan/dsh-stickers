@@ -149,7 +149,7 @@ window.__ModuleLoader__.load({
       const download = async () => {
         const ids = [...sel]
         if (!ids.length) {
-          setMsg('先勾选几个表情')
+          setMsg('先在图片上点一下勾选，再点「下载选中」；也可以切到「全部」后点「全选本页」。')
           return
         }
         setBusy(true)
@@ -158,14 +158,25 @@ window.__ModuleLoader__.load({
             method: 'POST',
             body: JSON.stringify({ ids }),
           })
-          setMsg(`开始下载 ${data.started || 0} 个，完成后切到「已下载待导入」`)
+          const started = data.started || 0
+          setMsg(
+            started
+              ? `已开始下载 ${started} 个，在后台转码；好了这一格的角标会变成「已下载」`
+              : `这 ${ids.length} 个不用再下了（已经下载过，或正在队列里）`,
+          )
           setSel(new Set())
-          setStatus('downloaded')
-          setOffset(0)
+          // 不切筛选、不清列表：原地把这几张的状态刷出来，用户还在原来的分类里
+          for (let i = 0; i < 6; i += 1) {
+            await new Promise((r) => setTimeout(r, 1200))
+            if (!alive.current) return
+            await load()
+            const done = items.filter((it) => ids.includes(it.id))
+            if (done.length && done.every((it) => it.status !== 'new')) break
+          }
         } catch (err) {
           setMsg(`下载失败：${err.message}`)
         } finally {
-          setBusy(false)
+          if (alive.current) setBusy(false)
         }
       }
 
@@ -429,6 +440,7 @@ window.__ModuleLoader__.load({
                 'div',
                 { className: 'dshst-photo' },
                 h('img', { className: 'dshst-thumb', src: `${BASE}/api/thumb/${it.id}`, alt: '', loading: 'lazy' }),
+                h('span', { className: 'dshst-pick' }, sel.has(it.id) ? '✓' : ''),
               ),
               // 分类名不再写在卡片上（选中哪个分类看上面的下拉就够了）
               isCatalog ? null : h('div', { className: 'dshst-meta' }, it.desc || '表情包'),
@@ -452,7 +464,32 @@ window.__ModuleLoader__.load({
                 { className: 'dshst-empty' },
                 needsLogin && !loggedIn
                   ? `还没读到${currentMarket ? currentMarket.name : ''}的表情：先点上面「扫码登录」，登录后再点「开始抓取」。`
-                  : '这个筛选下没有表情，换个状态看看，或者点「开始抓取」。',
+                  : [
+                      h(
+                        'div',
+                        { key: 't' },
+                        status === 'all'
+                          ? isCatalog && cats.length && category !== '__all__'
+                            ? '这个分类下还没有表情，点「开始抓取」拉一次。'
+                            : '这里还没有表情，点「开始抓取」拉一次。'
+                          : '这个状态下是空的——它们可能还在下载，或者已经导进微信了。',
+                      ),
+                      status === 'all'
+                        ? null
+                        : h(
+                            'button',
+                            {
+                              key: 'b',
+                              className: 'dshst-btn',
+                              style: 'margin-top:12px',
+                              onClick: () => {
+                                setStatus('all')
+                                setOffset(0)
+                              },
+                            },
+                            '看全部状态',
+                          ),
+                    ].filter(Boolean),
               ),
         ),
         h(
@@ -528,6 +565,9 @@ window.__ModuleLoader__.load({
 .dshst-grid { flex: 1 1 auto; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); grid-auto-rows: max-content; gap: 10px; align-content: start; }
 .dshst-card { position: relative; align-self: start; border: 1px solid var(--dsw-alias-border-base, #2c2f36); border-radius: 10px; overflow: hidden; cursor: pointer; background: var(--dsw-alias-bg-card, #16191e); }
 .dshst-card.on { border-color: #ffd84d; box-shadow: 0 0 0 1px #ffd84d inset; }
+.dshst-pick { position: absolute; top: 6px; left: 6px; width: 18px; height: 18px; border-radius: 50%; border: 1px solid rgba(255,255,255,.45); background: rgba(0,0,0,.45); color: #17191c; font-size: 12px; line-height: 18px; text-align: center; opacity: 0; transition: opacity .12s; }
+.dshst-card:hover .dshst-pick { opacity: .8; }
+.dshst-card.on .dshst-pick { opacity: 1; background: #ffd84d; border-color: #ffd84d; font-weight: 700; }
 .dshst-thumb { display: block; width: 100%; aspect-ratio: 1/1; object-fit: contain; background: #0e1013; }
 .dshst-photo { position: relative; display: block; }
 /* 状态徽标放在卡片底部一行，靠右，不压住图里的字 */
