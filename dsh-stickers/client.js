@@ -420,11 +420,6 @@ window.__ModuleLoader__.load({
                 'div',
                 { className: 'dshst-photo' },
                 h('img', { className: 'dshst-thumb', src: `${BASE}/api/thumb/${it.id}`, alt: '', loading: 'lazy' }),
-                h(
-                  'span',
-                  { className: `dshst-badge ${STATUS_CLASS[it.status] || 'wait'}` },
-                  STATUS_TEXT[it.status] || it.status,
-                ),
               ),
               // 分类名不再写在卡片上（选中哪个分类看上面的下拉就够了）
               isCatalog ? null : h('div', { className: 'dshst-meta' }, it.desc || '表情包'),
@@ -433,6 +428,11 @@ window.__ModuleLoader__.load({
                 { className: 'dshst-tags' },
                 h('span', { className: 'dshst-tag' }, it.is_animated ? 'GIF' : 'PNG'),
                 it.market && it.market !== 'douyin' ? h('span', { className: 'dshst-tag src' }, it.market) : null,
+                h(
+                  'span',
+                  { className: `dshst-badge ${STATUS_CLASS[it.status] || 'wait'}` },
+                  STATUS_TEXT[it.status] || it.status,
+                ),
               ),
             ),
           ),
@@ -516,15 +516,16 @@ window.__ModuleLoader__.load({
 .dshst-btn:disabled { opacity: .45; cursor: default; }
 .dshst-btn.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
 .dshst-msg { padding: 8px 12px; border-radius: 8px; background: rgba(255,216,77,.1); border: 1px solid rgba(255,216,77,.35); font-size: 12.5px; }
-.dshst-grid { flex: 1 1 auto; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px; align-content: start; }
+.dshst-grid { flex: 1 1 auto; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 10px; align-content: start; }
 .dshst-card { position: relative; border: 1px solid var(--dsw-alias-border-base, #2c2f36); border-radius: 10px; overflow: hidden; cursor: pointer; background: var(--dsw-alias-bg-card, #16191e); }
 .dshst-card.on { border-color: #ffd84d; box-shadow: 0 0 0 1px #ffd84d inset; }
 .dshst-thumb { display: block; width: 100%; aspect-ratio: 1/1; object-fit: contain; background: #0e1013; }
 .dshst-photo { position: relative; display: block; }
+/* 状态徽标放在卡片底部一行，靠右，不压住图里的字 */
 .dshst-badge {
-  position: absolute; right: 6px; bottom: 6px; padding: 1px 7px; border-radius: 999px;
-  font-size: 11px; line-height: 16px; background: rgba(0, 0, 0, .68);
-  border: 1px solid transparent; pointer-events: none;
+  margin-left: auto; padding: 1px 8px; border-radius: 999px;
+  font-size: 11px; line-height: 16px; background: rgba(255, 255, 255, .06);
+  border: 1px solid transparent; white-space: nowrap; pointer-events: none;
 }
 .dshst-badge.wait { color: #ffd84d; border-color: #6b5a20; }
 .dshst-badge.dl { color: #7cc4ff; border-color: #2b5570; }
@@ -532,7 +533,7 @@ window.__ModuleLoader__.load({
 .dshst-badge.skip { color: #b9b9b9; border-color: #454545; }
 .dshst-badge.err { color: #ff8b8b; border-color: #6b2a2a; }
 .dshst-meta { padding: 6px 8px 0; font-size: 11.5px; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dshst-tags { display: flex; gap: 4px; padding: 6px 8px 8px; flex-wrap: wrap; }
+.dshst-tags { display: flex; align-items: center; gap: 4px; padding: 6px 8px 8px; flex-wrap: wrap; }
 .dshst-tag { font-size: 10px; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--dsw-alias-border-base, #2c2f36); opacity: .8; }
 .dshst-tag.src { color: #ffd84d; border-color: #6b5a20; }
 .dshst-empty { grid-column: 1 / -1; padding: 40px; text-align: center; font-size: 13px; opacity: .55; }
