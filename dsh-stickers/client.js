@@ -115,6 +115,12 @@ window.__ModuleLoader__.load({
             offset: String(offset),
           })
           if (market) qs.set('market', market)
+          // 目录型来源：列表跟着所选分类走，这样拉哪个分类就只看那个分类
+          const cur = (markets || []).find((m) => m.id === market)
+          if (cur && cur.kind === 'catalog' && category && category !== '__all__') {
+            const hit = (cur.categories || []).find((c) => c.id === category)
+            if (hit && hit.name) qs.set('desc', hit.name)
+          }
           const data = await api(`/api/candidates?${qs}`)
           if (!alive.current) return
           setItems(data.items || [])
@@ -122,7 +128,7 @@ window.__ModuleLoader__.load({
         } catch (err) {
           if (alive.current) setMsg(`加载失败：${err.message}`)
         }
-      }, [market, status, offset])
+      }, [market, status, offset, markets, category])
 
       useEffect(() => {
         loadMarkets()
@@ -340,7 +346,10 @@ window.__ModuleLoader__.load({
                 {
                   className: 'dshst-input',
                   value: category,
-                  onChange: (e) => setCategory(e.target.value),
+                  onChange: (e) => {
+                    setCategory(e.target.value)
+                    setOffset(0)
+                  },
                 },
                 (cats.length ? cats : [{ id: '__all__', name: '全部表情包', count: 0 }]).map((c) =>
                   h(
@@ -516,8 +525,8 @@ window.__ModuleLoader__.load({
 .dshst-btn:disabled { opacity: .45; cursor: default; }
 .dshst-btn.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
 .dshst-msg { padding: 8px 12px; border-radius: 8px; background: rgba(255,216,77,.1); border: 1px solid rgba(255,216,77,.35); font-size: 12.5px; }
-.dshst-grid { flex: 1 1 auto; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 10px; align-content: start; }
-.dshst-card { position: relative; border: 1px solid var(--dsw-alias-border-base, #2c2f36); border-radius: 10px; overflow: hidden; cursor: pointer; background: var(--dsw-alias-bg-card, #16191e); }
+.dshst-grid { flex: 1 1 auto; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); grid-auto-rows: max-content; gap: 10px; align-content: start; }
+.dshst-card { position: relative; align-self: start; border: 1px solid var(--dsw-alias-border-base, #2c2f36); border-radius: 10px; overflow: hidden; cursor: pointer; background: var(--dsw-alias-bg-card, #16191e); }
 .dshst-card.on { border-color: #ffd84d; box-shadow: 0 0 0 1px #ffd84d inset; }
 .dshst-thumb { display: block; width: 100%; aspect-ratio: 1/1; object-fit: contain; background: #0e1013; }
 .dshst-photo { position: relative; display: block; }
