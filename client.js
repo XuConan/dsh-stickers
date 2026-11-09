@@ -87,6 +87,7 @@ window.__ModuleLoader__.load({
       const [jump, setJump] = useState('')
       const [sel, setSel] = useState(() => new Set())
       const [msg, setMsg] = useState('')
+      const [folderPath, setFolderPath] = useState('')
       const [busy, setBusy] = useState(false)
       const [counts, setCounts] = useState({})
       const alive = useRef(true)
@@ -202,10 +203,11 @@ window.__ModuleLoader__.load({
               await navigator.clipboard.writeText(folder)
             } catch {}
           }
+          setFolderPath(folder)
           setMsg(
             opened
               ? `已打开下载文件夹：${folder}`
-              : `窗口没能自动弹出来，路径已复制：${folder}（粘到资源管理器地址栏即可）`,
+              : '这台机器不让插件弹资源管理器，路径已复制（见下方），粘到地址栏回车即可。',
           )
         } catch (err) {
           setMsg(`打不开文件夹：${err.message}`)
@@ -288,7 +290,7 @@ window.__ModuleLoader__.load({
         setBusy(true)
         try {
           await api('/api/login', { method: 'POST', body: JSON.stringify({ market }) })
-          setMsg(`已打开${currentMarket ? currentMarket.name : ''}登录窗口：扫码后回来点一次「检测」`)
+          setMsg(`已打开${currentMarket ? currentMarket.name : ''}登录窗口：扫码后回来点一次「检测」。如果那个窗口是白屏，点「刷新」或再点一次「扫码登录」。`)
         } catch (err) {
           setMsg(`打开登录窗口失败：${err.message}`)
         } finally {
@@ -421,6 +423,24 @@ window.__ModuleLoader__.load({
           ),
         ),
         msg ? h('div', { className: 'dshst-msg' }, msg) : null,
+        folderPath
+          ? h(
+              'div',
+              {
+                className: 'dshst-path',
+                title: '点一下复制',
+                onClick: async () => {
+                  try {
+                    await navigator.clipboard.writeText(folderPath)
+                    setMsg(`路径已复制：${folderPath}`)
+                  } catch {
+                    setMsg('复制失败，请手动选中下面这行路径复制')
+                  }
+                },
+              },
+              folderPath,
+            )
+          : null,
         h(
           'div',
           { className: 'dshst-grid' },
@@ -558,6 +578,7 @@ window.__ModuleLoader__.load({
 .dshst-btn:disabled { opacity: .45; cursor: default; }
 .dshst-btn.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
 .dshst-msg { padding: 8px 12px; border-radius: 8px; background: rgba(255,216,77,.1); border: 1px solid rgba(255,216,77,.35); font-size: 12.5px; }
+.dshst-path { margin-top: 6px; padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,.05); border: 1px dashed rgba(255,255,255,.25); font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; color: #e6e8ea; cursor: pointer; user-select: all; word-break: break-all; }
 .dshst-grid { flex: 1 1 auto; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); grid-auto-rows: max-content; gap: 10px; align-content: start; }
 .dshst-card { position: relative; align-self: start; border: 1px solid var(--dsw-alias-border-base, #2c2f36); border-radius: 10px; overflow: hidden; cursor: pointer; background: var(--dsw-alias-bg-card, #16191e); }
 .dshst-card.on { border-color: #ffd84d; box-shadow: 0 0 0 1px #ffd84d inset; }

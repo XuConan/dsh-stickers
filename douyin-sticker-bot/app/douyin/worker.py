@@ -160,11 +160,7 @@ class Collector:
         self.logged_in = False
         self.bus.emit("need_login",
                       msg="请在弹出的浏览器里扫码登录抖音，登录后会自动继续")
-        try:
-            self._page.goto("https://www.douyin.com/", wait_until="domcontentloaded",
-                            timeout=60_000)
-        except Exception:  # noqa: BLE001
-            pass
+        self._open_login_page()
         deadline = time.time() + self.cfg.login_timeout
         while time.time() < deadline:
             if self._check_login():
@@ -173,6 +169,51 @@ class Collector:
                 return
             time.sleep(3)
         raise RuntimeError("等待抖音扫码登录超时，请重试")
+
+    def _open_login_page(self) -> None:
+        """把登录页打开并切到前台；打不开要说清楚，别留个白屏让人猜。"""
+        # 上一轮登录把窗口关掉了：这个 page 已经死了，得整个重启浏览器
+        try:
+            if self._page is None or self._page.is_closed():
+                self._shutdown()
+                self._ensure_browser()
+        except Exception:  # noqa: BLE001
+            self._shutdown()
+            self._ensure_browser()
+        try:
+            self._page.bring_to_front()
+        except Exception:  # noqa: BLE001
+            pass
+        last = ""
+        for url in ("https://www.douyin.com/", "https://www.douyin.com"):
+            try:
+                self._page.goto(url, wait_until="domcontentloaded", timeout=45_000)
+                last = ""
+                break
+            except Exception as exc:  # noqa: BLE001
+                last = f"{type(exc).__name__}: {exc}".splitlines()[0]
+                self.bus.emit("log", msg=f"打开登录页失败（{url}）：{last}")
+                # 常见于用户把那个窗口关了：重启浏览器再来一次
+                try:
+                    if self._page is None or self._page.is_closed():
+                        self._shutdown()
+                        self._ensure_browser()
+                        self._page.goto(url, wait_until="domcontentloaded",
+                                        timeout=45_000)
+                        last = ""
+                        break
+                except Exception:  # noqa: BLE001
+                    pass
+        try:
+            self._page.bring_to_front()
+        except Exception:  # noqa: BLE001
+            pass
+        if last:
+            self.bus.emit(
+                "warn", msg=f"浏览器起来了，但抖音首页没加载出来（{last}）。"
+                           "可以在那个窗口里刷新一下，或手动打开 douyin.com 再扫码。")
+        else:
+            self.bus.emit("log", msg="登录页已打开，扫码后会自动继续")
 
     # ---------------- 抓取 ----------------
     def _on_response(self, resp) -> None:  # noqa: ANN001

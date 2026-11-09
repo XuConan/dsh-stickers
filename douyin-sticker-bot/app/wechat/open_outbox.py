@@ -5,13 +5,36 @@ import ctypes
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 WEIXIN_EXE = Path(r"C:\Program Files\Tencent\Weixin\Weixin.exe")
 
 
-def open_folder(path: Path) -> None:
-    os.startfile(str(path))  # noqa: S606  (Windows 专用)
+def open_folder(path: Path) -> str:
+    """在资源管理器里打开这个目录，返回真正生效的方式。
+
+    DSH 里插件拉起的进程常被挡掉 ShellExecute（`os.startfile` 报
+    WinError 5），所以再试两次更底层的启动方式，全都失败才抛。
+    """
+    target = str(path)
+    errors = []
+    try:
+        os.startfile(target)  # noqa: S606  (Windows 专用)
+        return "startfile"
+    except OSError as exc:
+        errors.append(f"startfile: {exc}")
+    for name, cmd in (("explorer.exe", ["explorer.exe", target]),
+                      ("cmd start", ["cmd", "/c", "start", "", target])):
+        try:
+            proc = subprocess.Popen(cmd, close_fds=True)  # noqa: S603
+            time.sleep(0.8)
+            if proc.poll() in (None, 0):
+                return name
+            errors.append(f"{name}: exit {proc.returncode}")
+        except OSError as exc:
+            errors.append(f"{name}: {exc}")
+    raise OSError("；".join(errors))
 
 
 def wechat_running() -> bool:

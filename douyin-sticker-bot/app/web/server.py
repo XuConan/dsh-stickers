@@ -712,8 +712,8 @@ def make_handler(app: App):
                     target = body.get("target", "stickers")
                     p = app.cfg.outbox_dir if target == "outbox" else app.cfg.stickers_dir
                     try:
-                        open_outbox.open_folder(p)
-                        self._json({"ok": True, "folder": str(p)})
+                        how = open_outbox.open_folder(p)
+                        self._json({"ok": True, "folder": str(p), "via": how})
                     except Exception as exc:  # noqa: BLE001
                         # 打开资源管理器被系统/沙箱拦住不算错，文件已经在盘上了
                         self._json({"ok": False, "folder": str(p),

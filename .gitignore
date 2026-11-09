@@ -16,3 +16,5 @@ node_modules/
 # 探针/测试留下的临时文件
 tmp*.json
 xhsprobe-*/
+.push_key
+.push_key.pub
