@@ -179,6 +179,33 @@ class TestMarketColumn(unittest.TestCase):
         self.assertEqual(store.delete_candidates(db=self.db), 1)   # 不带条件=全删
         self.assertEqual(store.count_candidates(db=self.db), 0)
 
+    def test_reset_missing_files(self):
+        """文件被删掉的「已下载」条目要改回未下载，并清掉内容指纹。"""
+        store.init(self.db)
+        keep = self.dir / "keep.png"
+        keep.write_bytes(b"png")
+        gone = self.dir / "gone.png"
+        gone.write_bytes(b"png")
+
+        cid_keep = store.add_candidate(_item("https://x/keep.png"), db=self.db)
+        cid_gone = store.add_candidate(_item("https://x/gone.png"), db=self.db)
+        store.update_candidate(cid_keep, status="downloaded", path=str(keep),
+                               sha256="a" * 64, dhash="0123456789abcdef", db=self.db)
+        store.update_candidate(cid_gone, status="downloaded", path=str(gone),
+                               sha256="b" * 64, dhash="fedcba9876543210", db=self.db)
+        gone.unlink()                              # 用户在资源管理器里删掉
+
+        self.assertEqual(store.reset_missing_files(db=self.db), 1)
+        rows = {r["id"]: r for r in store.list_candidates(db=self.db)}
+        self.assertEqual(rows[cid_keep]["status"], "downloaded")   # 还在的不动
+        self.assertEqual(rows[cid_gone]["status"], "new")          # 没了就回到未下载
+        self.assertIsNone(rows[cid_gone]["path"])
+        # 指纹清空，否则重新下载会被内容去重判成 duplicate
+        self.assertIsNone(rows[cid_gone]["sha256"])
+        self.assertIsNone(rows[cid_gone]["dhash"])
+        self.assertEqual(store.count_candidates(["downloaded"], db=self.db), 1)
+        self.assertEqual(store.reset_missing_files(db=self.db), 0)  # 幂等
+
     def test_pagination(self):
         store.init(self.db)
         for i in range(7):

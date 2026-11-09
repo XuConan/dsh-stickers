@@ -177,6 +177,36 @@ def get_candidate(cid: int, db: Optional[Path] = None) -> Optional[dict]:
     return dict(row) if row else None
 
 
+ON_DISK_STATUSES = ("downloaded", "imported", "duplicate")
+
+
+def reset_missing_files(db: Optional[Path] = None) -> int:
+    """把「标着已下载、文件却不在」的条目改回未下载，返回改了几条。
+
+    状态原本只是数据库里的一行字：用户在资源管理器里删掉 `data/stickers`
+    的文件后，库里仍然写着 downloaded，面板就一直显示「已下载」。这里按实际
+    文件是否存在来纠正；同时清掉 sha256/dhash，否则内容去重会把重新下载
+    判成「重复」。
+    """
+    db = db or cfg_mod.load_config().db_path
+    with closing(_connect(db)) as conn:
+        rows = conn.execute(
+            "SELECT id, path FROM candidates"
+            " WHERE status IN (?,?,?) AND path IS NOT NULL AND path != ''",
+            ON_DISK_STATUSES,
+        ).fetchall()
+        missing = [(int(r["id"]),) for r in rows if not Path(r["path"]).exists()]
+        if not missing:
+            return 0
+        conn.executemany(
+            "UPDATE candidates SET status='new', path=NULL, sha256=NULL,"
+            " dhash=NULL, imported_at=NULL WHERE id=?",
+            missing,
+        )
+        conn.commit()
+    return len(missing)
+
+
 def delete_candidates(statuses: Optional[Iterable[str]] = None,
                       market: Optional[str] = None,
                       desc: Optional[str] = None,

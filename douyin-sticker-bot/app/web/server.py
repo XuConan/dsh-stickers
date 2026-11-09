@@ -139,8 +139,30 @@ class App:
         self.collector = collector
         self.dl = Downloader(cfg)
         self.hit_logged = False
+        # 上次核对「已下载」的文件还在不在的时间点（别每个请求都 stat 一遍）
+        self._reconcile_at = 0.0
 
     # ---------- 业务动作 ----------
+    def reconcile(self, force: bool = False) -> int:
+        """把「标着已下载、文件却被删了」的条目改回未下载。
+
+        状态只是库里的一行字，用户在资源管理器里清空 data/stickers 之后
+        面板还会一直显示「已下载」。这里每 10 秒最多核对一次磁盘。
+        """
+        now = time.time()
+        if not force and now - self._reconcile_at < 10.0:
+            return 0
+        self._reconcile_at = now
+        try:
+            reset = store.reset_missing_files()
+        except Exception as exc:  # 核对失败不该影响列表
+            self.bus.emit("log", text=f"核对本地文件出错：{type(exc).__name__}: {exc}")
+            return 0
+        if reset:
+            self.bus.emit(
+                "log", text=f"有 {reset} 个已下载的文件已经不在本地了，改回「未下载」")
+        return reset
+
     def selftest(self) -> dict:
         """能不能往自己的目录里写东西（被沙箱限制时会失败）。"""
         out: dict = {"writable": True, "dirs": {}}
@@ -161,6 +183,7 @@ class App:
         return out
 
     def state(self) -> dict:
+        self.reconcile()
         c = store.counts()
         outbox = self.cfg.outbox_dir
         pending = len([p for p in outbox.iterdir() if p.is_file()]) if outbox.exists() else 0
@@ -482,6 +505,7 @@ def make_handler(app: App):
                 elif path == "/api/selftest":
                     self._json(app.selftest())
                 elif path == "/api/candidates":
+                    app.reconcile()
                     qs = parse_qs(u.query)
                     # 默认只给「还没下载到本地」的：已下载/已导入的没必要再拉一遍
                     raw = qs.get("status", ["new"])[0]
