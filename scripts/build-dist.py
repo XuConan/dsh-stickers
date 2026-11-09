@@ -21,7 +21,19 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent          # dsh-stickers/
 WORKSPACE = ROOT.parent                                 # default-workspace/
-PROJECT = WORKSPACE / "douyin-sticker-bot"
+
+
+def _find_project() -> Path:
+    """后端源码在哪：三种布局都认（仓库内同级 / 工作区同级 / 环境变量指定）。"""
+    for cand in (os.environ.get("DSH_STICKERS_PROJECT", "").strip(),
+                 ROOT / "douyin-sticker-bot",
+                 WORKSPACE / "douyin-sticker-bot"):
+        if cand and (Path(cand) / "app" / "__main__.py").is_file():
+            return Path(cand)
+    return WORKSPACE / "douyin-sticker-bot"
+
+
+PROJECT = _find_project()
 DIST = ROOT / "dist"
 
 PLUGIN_FILES = [
